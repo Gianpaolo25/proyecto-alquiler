@@ -25,6 +25,10 @@ const servicioRoutes = require('./src/routes/servicio.routes');
 const usuarioRolRoutes = require('./src/routes/usuarioRol.routes');
 const departamentoServicioRoutes = require('./src/routes/departamentoServicio.routes');
 
+const misDepartamentosRoutes = require('./src/routes/misDepartamentos.routes');
+const invitacionesRoutes = require('./src/routes/invitaciones.routes');
+
+
 // Usar rutas
 app.use('/api/usuario', usuarioRoutes);
 app.use('/api/alquiler', alquilerRoutes);
@@ -41,6 +45,15 @@ app.use('/api/codigoVinculacion', codigoRoutes);
 app.use('/api/servicio', servicioRoutes);
 app.use('/api/usuarioRol', usuarioRolRoutes);
 app.use('/api/departamentoServicio', departamentoServicioRoutes);
+
+app.use('/api/mis-departamentos', misDepartamentosRoutes);
+app.use('/api/invitaciones', invitacionesRoutes);
+
+// Importar ruta de autenticación
+const authRoutes = require('./src/routes/auth.routes');
+
+// Usar ruta de autenticación
+app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
   res.json({ mensaje: 'API de Sistema de Alquiler funcionando correctamente' });

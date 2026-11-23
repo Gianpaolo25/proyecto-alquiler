@@ -26,7 +26,22 @@ const crearUsuario = (req, res) => {
   });
 };
 
+const listarUsuariosRegistrados = (req, res) => {
+  const sql = `
+    SELECT idusuario, nombre, apellido, email
+    FROM usuario
+    WHERE estado = 'Alta' AND idusuario <> ?
+    ORDER BY nombre ASC, apellido ASC
+  `;
+
+  db.query(sql, [req.usuarioId], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+};
+
 module.exports = {
   obtenerUsuarios,
-  crearUsuario
+  crearUsuario,
+  listarUsuariosRegistrados,
 };
