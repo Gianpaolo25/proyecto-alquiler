@@ -38,6 +38,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
+import GestionDepartamentoPage from './pages/GestionDepartamentoPage';
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/gestion-departamento/:id" element={<GestionDepartamentoPage />} />
       </Routes>
     </BrowserRouter>
   );

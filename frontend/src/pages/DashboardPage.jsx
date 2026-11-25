@@ -1,56 +1,3 @@
-/*
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-
-function obtenerSesionGuardada() {
-  const token = localStorage.getItem('token');
-  const datosGuardados = localStorage.getItem('usuario');
-
-  if (!token || !datosGuardados) {
-    return { token: null, usuario: null };
-  }
-
-  try {
-    return { token, usuario: JSON.parse(datosGuardados) };
-  } catch {
-    return { token: null, usuario: null };
-  }
-}
-
-function DashboardPage() {
-  const [{ token, usuario }] = useState(obtenerSesionGuardada);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!token || !usuario) {
-      navigate('/login');
-    }
-  }, [token, usuario, navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
-    navigate('/login');
-  };
-
-  if (!token || !usuario) return null;
-
-  return (
-    <div style={{ maxWidth: '600px', margin: '3rem auto', fontFamily: 'sans-serif' }}>
-      <h1>Panel Principal</h1>
-      <p>
-        ¡Hola, <strong>{usuario.nombre} {usuario.apellido}</strong>! ({usuario.email})
-      </p>
-      <button onClick={handleLogout} style={{ padding: '8px 16px', cursor: 'pointer' }}>
-        Cerrar sesión
-      </button>
-    </div>
-  );
-}
-
-export default DashboardPage;
-*/
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -112,7 +59,6 @@ function DashboardPage() {
     mensaje: '',
   });
 
-  const [deptoGestionado, setDeptoGestionado] = useState(null);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
 
   const aplicarDatosPanel = (data) => {
@@ -250,6 +196,24 @@ function DashboardPage() {
       setFeedback({
         tipo: 'error',
         texto: err.response?.data?.error || 'Error al aceptar la invitación',
+      });
+    }
+  };
+
+  const handleRechazarInvitacion = async (idSolicitud) => {
+    setFeedback({ tipo: '', texto: '' });
+    try {
+      const res = await api.post(`/invitaciones/${idSolicitud}/rechazar`, {});
+      setFeedback({
+        tipo: 'ok',
+        texto: res.data.mensaje || 'Invitación rechazada.',
+      });
+      const datosActualizados = await fetchDatosPanel();
+      aplicarDatosPanel(datosActualizados);
+    } catch (err) {
+      setFeedback({
+        tipo: 'error',
+        texto: err.response?.data?.error || 'Error al rechazar la invitación',
       });
     }
   };
@@ -487,7 +451,7 @@ function DashboardPage() {
                     <strong>{d.edificio_nombre}</strong> — Depto {d.identificador}{' '}
                     <button
                       type="button"
-                      onClick={() => setDeptoGestionado({ ...d, rol: 'Propietario' })}
+                      onClick={() => navigate(`/gestion-departamento/${d.iddepartamento}`)}
                       style={{ marginLeft: '6px', cursor: 'pointer' }}
                     >
                       Gestionar
@@ -509,7 +473,7 @@ function DashboardPage() {
                     <strong>{d.edificio_nombre}</strong> — Depto {d.identificador}{' '}
                     <button
                       type="button"
-                      onClick={() => setDeptoGestionado({ ...d, rol: 'Inquilino' })}
+                      onClick={() => navigate(`/gestion-departamento/${d.iddepartamento}`)}
                       style={{ marginLeft: '6px', cursor: 'pointer' }}
                     >
                       Gestionar
@@ -520,35 +484,6 @@ function DashboardPage() {
             )}
           </div>
         </div>
-
-        {deptoGestionado && (
-          <div
-            style={{
-              marginTop: '1rem',
-              padding: '12px',
-              background: '#f4f6f7',
-              borderRadius: '6px',
-            }}
-          >
-            <strong>
-              Opciones de gestión — {deptoGestionado.edificio_nombre} ({deptoGestionado.identificador})
-            </strong>
-            <p style={{ margin: '6px 0' }}>
-              Tu rol en este departamento: <strong>{deptoGestionado.rol}</strong>
-            </p>
-            {deptoGestionado.rol === 'Propietario' ? (
-              <p style={{ margin: 0, fontSize: '14px' }}>
-                Acciones disponibles: Enviar invitaciones de alquiler por email, administrar
-                servicios/boletas y revisar cuotas/comprobantes.
-              </p>
-            ) : (
-              <p style={{ margin: 0, fontSize: '14px' }}>
-                Acciones disponibles: Consultar fechas de alquiler, ver boletas de servicio y cargar
-                comprobantes de pago.
-              </p>
-            )}
-          </div>
-        )}
       </section>
 
       {/* 5. Invitaciones de Alquiler Recibidas */}
@@ -580,13 +515,22 @@ function DashboardPage() {
                   </div>
                 </div>
                 {inv.estado === 'Pendiente' && (
-                  <button
-                    type="button"
-                    onClick={() => handleAceptarInvitacion(inv.idsolicitud_alquiler)}
-                    style={{ padding: '6px 12px', cursor: 'pointer' }}
-                  >
-                    Aceptar y quedar como Inquilino
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleAceptarInvitacion(inv.idsolicitud_alquiler)}
+                      style={{ padding: '6px 12px', cursor: 'pointer' }}
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRechazarInvitacion(inv.idsolicitud_alquiler)}
+                      style={{ padding: '6px 12px', cursor: 'pointer' }}
+                    >
+                      Rechazar
+                    </button>
+                  </div>
                 )}
               </li>
             ))}

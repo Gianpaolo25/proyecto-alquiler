@@ -28,6 +28,7 @@ const departamentoServicioRoutes = require('./src/routes/departamentoServicio.ro
 const misDepartamentosRoutes = require('./src/routes/misDepartamentos.routes');
 const invitacionesRoutes = require('./src/routes/invitaciones.routes');
 
+const gestionDepartamentoRoutes = require('./src/routes/gestionDepartamento.routes');
 
 // Usar rutas
 app.use('/api/usuario', usuarioRoutes);
@@ -48,6 +49,8 @@ app.use('/api/departamentoServicio', departamentoServicioRoutes);
 
 app.use('/api/mis-departamentos', misDepartamentosRoutes);
 app.use('/api/invitaciones', invitacionesRoutes);
+
+app.use('/api/gestion-departamento', gestionDepartamentoRoutes);
 
 // Importar ruta de autenticación
 const authRoutes = require('./src/routes/auth.routes');
