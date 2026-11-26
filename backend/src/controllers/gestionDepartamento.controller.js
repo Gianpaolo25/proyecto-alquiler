@@ -306,9 +306,274 @@ const actualizarEstadoCuota = (req, res) => {
   });
 };
 
+// POST /api/gestion-departamento/:departamentoId/servicios
+// Crea un servicio (con nombre, precio y periodicidad) y lo asocia al departamento
+const crearServicioDepartamento = (req, res) => {
+  const { departamentoId } = req.params;
+  const usuarioId = req.usuarioId;
+  const {
+    nombre,
+    precio,
+    frecuencia, // ej. 'Mensual', 'Bimestral', 'Trimestral', 'Anual'
+    proveedor,
+    identificador_cuenta,
+    fecha_inicio,
+    fecha_fin,
+  } = req.body;
+
+  if (!nombre || !frecuencia) {
+    return res.status(400).json({ error: 'nombre y frecuencia (cada cuánto se paga) son obligatorios' });
+  }
+
+  resolverRolYDepartamento(departamentoId, usuarioId, (errRol, acceso) => {
+    if (errRol) return res.status(500).json({ error: errRol.message });
+    if (!acceso) {
+      return res.status(403).json({ error: 'No tienes acceso a este departamento' });
+    }
+
+    const tipoServicioTexto = precio
+      ? `${frecuencia.trim()} - $${Number(precio).toFixed(2)}`
+      : frecuencia.trim();
+
+    db.query('SELECT COALESCE(MAX(idservicio), 0) + 1 AS nextId FROM servicio', (errId, idRows) => {
+      if (errId) return res.status(500).json({ error: errId.message });
+      const nextServicioId = idRows[0].nextId;
+
+      const sqlServ = 'INSERT INTO servicio (idservicio, nombre, tipo_de_servicio) VALUES (?, ?, ?)';
+      db.query(sqlServ, [nextServicioId, nombre.trim(), tipoServicioTexto], (errServ) => {
+        if (errServ) return res.status(500).json({ error: errServ.message });
+
+        const sqlDeptoServ = `
+          INSERT INTO departamento_servicio
+            (departamento_id, servicio_id, proveedor, identificador_cuenta, fecha_inicio, fecha_fin)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        const inicioFinal = fecha_inicio || new Date().toISOString().slice(0, 10);
+
+        db.query(
+          sqlDeptoServ,
+          [
+            departamentoId,
+            nextServicioId,
+            proveedor || null,
+            identificador_cuenta || null,
+            inicioFinal,
+            fecha_fin || null,
+          ],
+          (errDs, dsResult) => {
+            if (errDs) return res.status(500).json({ error: errDs.message });
+            res.status(201).json({
+              mensaje: 'Servicio creado y asociado al departamento con éxito.',
+              idservicio: nextServicioId,
+              iddepartamento_servicio: dsResult.insertId,
+            });
+          }
+        );
+      });
+    });
+  });
+};
+
+// POST /api/gestion-departamento/:departamentoId/boletas
+// Propietario o Inquilino puede subir/registrar una boleta de servicio
+const crearBoletaServicio = (req, res) => {
+  const { departamentoId } = req.params;
+  const usuarioId = req.usuarioId;
+  const {
+    departamento_servicio_id,
+    numero_boleta,
+    periodo_desde,
+    periodo_hasta,
+    fecha_emision,
+    fecha_vencimiento,
+    importe,
+    moneda,
+    archivo_boleta,
+  } = req.body;
+
+  if (!departamento_servicio_id || !importe) {
+    return res.status(400).json({ error: 'departamento_servicio_id e importe son obligatorios' });
+  }
+
+  resolverRolYDepartamento(departamentoId, usuarioId, (errRol, acceso) => {
+    if (errRol) return res.status(500).json({ error: errRol.message });
+    if (!acceso) {
+      return res.status(403).json({ error: 'No tienes acceso a este departamento' });
+    }
+
+    const sql = `
+      INSERT INTO boleta_servicio
+        (departamento_servicio_id, alquiler_id, numero_boleta, periodo_desde, periodo_hasta, fecha_emision, fecha_vencimiento, importe, moneda, archivo_boleta, estado)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+    `;
+
+    db.query(
+      sql,
+      [
+        Number(departamento_servicio_id),
+        acceso.info.idalquiler || null,
+        numero_boleta || null,
+        periodo_desde || null,
+        periodo_hasta || null,
+        fecha_emision || new Date().toISOString().slice(0, 10),
+        fecha_vencimiento || null,
+        Number(importe),
+        (moneda || 'ARS').trim().toUpperCase().slice(0, 3),
+        archivo_boleta || null,
+      ],
+      (errBol, result) => {
+        if (errBol) return res.status(500).json({ error: errBol.message });
+        res.status(201).json({
+          mensaje: 'Boleta de servicio registrada como Pendiente.',
+          idboleta_servicio: result.insertId,
+        });
+      }
+    );
+  });
+};
+
+// POST /api/gestion-departamento/:departamentoId/cuotas
+// Propietario crea una cuota de alquiler adicional
+const crearCuotaAlquiler = (req, res) => {
+  const { departamentoId } = req.params;
+  const usuarioId = req.usuarioId;
+  const { periodo, fecha_vencimiento, importe, moneda } = req.body;
+
+  if (!periodo || !importe) {
+    return res.status(400).json({ error: 'periodo e importe son obligatorios' });
+  }
+
+  resolverRolYDepartamento(departamentoId, usuarioId, (errRol, acceso) => {
+    if (errRol) return res.status(500).json({ error: errRol.message });
+    if (!acceso || acceso.rol !== 'Propietario') {
+      return res.status(403).json({ error: 'Solo el propietario puede crear cuotas de alquiler' });
+    }
+    if (!acceso.info.idalquiler) {
+      return res.status(400).json({ error: 'El departamento aún no tiene un alquiler activo' });
+    }
+
+    const sql = `
+      INSERT INTO cuota_alquiler
+        (alquiler_id, periodo, fecha_vencimiento, importe, moneda, estado, fecha_generacion)
+      VALUES (?, ?, ?, ?, ?, 'Pendiente', NOW())
+    `;
+
+    db.query(
+      sql,
+      [
+        acceso.info.idalquiler,
+        periodo,
+        fecha_vencimiento || null,
+        Number(importe),
+        (moneda || 'ARS').trim().toUpperCase().slice(0, 3),
+      ],
+      (errCuo, result) => {
+        if (errCuo) {
+          if (errCuo.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ error: 'Ya existe una cuota para ese período en este alquiler' });
+          }
+          return res.status(500).json({ error: errCuo.message });
+        }
+        res.status(201).json({
+          mensaje: 'Cuota de alquiler creada en estado Pendiente.',
+          idcuota_alquiler: result.insertId,
+        });
+      }
+    );
+  });
+};
+
+
+// PATCH /api/gestion-departamento/:departamentoId/comprobantes/:comprobanteId/revision
+const revisarComprobante = (req, res) => {
+  const { departamentoId, comprobanteId } = req.params;
+  const usuarioId = req.usuarioId;
+  const { estado_revision, observacion } = req.body;
+
+  if (!['aprobado', 'rechazado'].includes(estado_revision)) {
+    return res.status(400).json({ error: 'estado_revision debe ser aprobado o rechazado' });
+  }
+
+  resolverRolYDepartamento(departamentoId, usuarioId, (errRol, acceso) => {
+    if (errRol) return res.status(500).json({ error: errRol.message });
+    if (!acceso || acceso.rol !== 'Propietario') {
+      return res.status(403).json({ error: 'Solo el propietario puede revisar comprobantes' });
+    }
+
+    const sqlBuscar = `
+      SELECT
+        cp.idcomprobante_pago,
+        cp.boleta_servicio_id,
+        cp.cuota_alquiler_id,
+        ds.departamento_id AS depto_boleta,
+        td.departamento_id AS depto_cuota
+      FROM comprobante_pago cp
+      LEFT JOIN boleta_servicio bs ON cp.boleta_servicio_id = bs.idboleta_servicio
+      LEFT JOIN departamento_servicio ds ON bs.departamento_servicio_id = ds.iddepartamento_servicio
+      LEFT JOIN cuota_alquiler ca ON cp.cuota_alquiler_id = ca.idcuota_alquiler
+      LEFT JOIN alquiler a ON ca.alquiler_id = a.idalquiler
+      LEFT JOIN solicitud_alquiler sa ON a.solicitud_alquiler_id = sa.idsolicitud_alquiler
+      LEFT JOIN titularidad_departamento td ON sa.titularidad_departamento_id = td.idtitularidad
+      WHERE cp.idcomprobante_pago = ?
+      LIMIT 1
+    `;
+
+    db.query(sqlBuscar, [comprobanteId], (errBus, rows) => {
+      if (errBus) return res.status(500).json({ error: errBus.message });
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Comprobante no encontrado' });
+      }
+
+      const comp = rows[0];
+      const deptoIdComp = comp.depto_boleta || comp.depto_cuota;
+      if (Number(deptoIdComp) !== Number(departamentoId)) {
+        return res.status(403).json({ error: 'El comprobante no pertenece a este departamento' });
+      }
+
+      const sqlUpd = `
+        UPDATE comprobante_pago
+        SET estado_revision = ?,
+            revisado_por_id = ?,
+            observacion = COALESCE(?, observacion)
+        WHERE idcomprobante_pago = ?
+      `;
+
+      db.query(
+        sqlUpd,
+        [estado_revision, usuarioId, observacion || null, comprobanteId],
+        (errUpd) => {
+          if (errUpd) return res.status(500).json({ error: errUpd.message });
+
+          if (estado_revision === 'aprobado') {
+            if (comp.cuota_alquiler_id) {
+              db.query(
+                "UPDATE cuota_alquiler SET estado = 'Pagada' WHERE idcuota_alquiler = ?",
+                [comp.cuota_alquiler_id]
+              );
+            }
+            if (comp.boleta_servicio_id) {
+              db.query(
+                "UPDATE boleta_servicio SET estado = 'Pagada' WHERE idboleta_servicio = ?",
+                [comp.boleta_servicio_id]
+              );
+            }
+          }
+
+          res.json({ mensaje: `Comprobante marcado como ${estado_revision}.` });
+        }
+      );
+    });
+  });
+};
+
+
 module.exports = {
   obtenerDetalleGestion,
   subirComprobante,
   actualizarEstadoBoleta,
   actualizarEstadoCuota,
+  crearServicioDepartamento,
+  crearCuotaAlquiler,
+  crearBoletaServicio,
+  revisarComprobante,
 };

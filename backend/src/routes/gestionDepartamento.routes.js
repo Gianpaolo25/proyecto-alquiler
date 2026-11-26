@@ -8,4 +8,10 @@ router.post('/:departamentoId/comprobantes', verificarToken, controller.subirCom
 router.patch('/:departamentoId/boletas/:boletaId/estado', verificarToken, controller.actualizarEstadoBoleta);
 router.patch('/:departamentoId/cuotas/:cuotaId/estado', verificarToken, controller.actualizarEstadoCuota);
 
+router.post('/:departamentoId/servicios', verificarToken, controller.crearServicioDepartamento);
+router.post('/:departamentoId/boletas', verificarToken, controller.crearBoletaServicio);
+router.post('/:departamentoId/cuotas', verificarToken, controller.crearCuotaAlquiler);
+
+router.patch('/:departamentoId/comprobantes/:comprobanteId/revision',verificarToken, controller.revisarComprobante);
+
 module.exports = router;

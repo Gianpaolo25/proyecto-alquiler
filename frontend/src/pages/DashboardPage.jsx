@@ -56,6 +56,10 @@ function DashboardPage() {
   const [invitacionForm, setInvitacionForm] = useState({
     departamento_id: '',
     email_invitado: '',
+    fecha_inicio: new Date().toISOString().slice(0, 10),
+    fecha_fin: '',
+    importe_mensual: '',
+    moneda: 'ARS',
     mensaje: '',
   });
 
@@ -382,45 +386,93 @@ function DashboardPage() {
         </form>
 
         <form
-          onSubmit={handleEnviarInvitacion}
-          style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}
-        >
-          <h3>3. Invitar Inquilino por Email (Propietario)</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <select
-              value={invitacionForm.departamento_id}
-              onChange={(e) =>
-                setInvitacionForm({ ...invitacionForm, departamento_id: e.target.value })
-              }
-              required
-            >
-              <option value="">Selecciona uno de tus departamentos...</option>
-              {misDepartamentos.propietario.map((d) => (
-                <option key={d.iddepartamento} value={d.iddepartamento}>
-                  {d.edificio_nombre} - {d.identificador}
-                </option>
-              ))}
-            </select>
-            <input
-              type="email"
-              placeholder="Email del usuario registrado"
-              value={invitacionForm.email_invitado}
-              onChange={(e) =>
-                setInvitacionForm({ ...invitacionForm, email_invitado: e.target.value })
-              }
-              required
-            />
-            <input
-              type="text"
-              placeholder="Mensaje opcional para el inquilino"
-              value={invitacionForm.mensaje}
-              onChange={(e) => setInvitacionForm({ ...invitacionForm, mensaje: e.target.value })}
-            />
-            <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-              Enviar Invitación de Alquiler
-            </button>
-          </div>
-        </form>
+  onSubmit={handleEnviarInvitacion}
+  style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}
+>
+  <h3>3. Invitar Inquilino por Email (Propietario)</h3>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <select
+      value={invitacionForm.departamento_id}
+      onChange={(e) =>
+        setInvitacionForm({ ...invitacionForm, departamento_id: e.target.value })
+      }
+      required
+    >
+      <option value="">Selecciona uno de tus departamentos...</option>
+      {misDepartamentos.propietario.map((d) => (
+        <option key={d.iddepartamento} value={d.iddepartamento}>
+          {d.edificio_nombre} - {d.identificador}
+        </option>
+      ))}
+    </select>
+    <input
+      type="email"
+      placeholder="Email del usuario registrado"
+      value={invitacionForm.email_invitado}
+      onChange={(e) =>
+        setInvitacionForm({ ...invitacionForm, email_invitado: e.target.value })
+      }
+      required
+    />
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ flex: 1 }}>
+        <label style={{ fontSize: '12px' }}>Desde:</label>
+        <input
+          type="date"
+          value={invitacionForm.fecha_inicio}
+          onChange={(e) =>
+            setInvitacionForm({ ...invitacionForm, fecha_inicio: e.target.value })
+          }
+          required
+          style={{ width: '100%' }}
+        />
+      </div>
+      <div style={{ flex: 1 }}>
+        <label style={{ fontSize: '12px' }}>Hasta:</label>
+        <input
+          type="date"
+          value={invitacionForm.fecha_fin}
+          onChange={(e) =>
+            setInvitacionForm({ ...invitacionForm, fecha_fin: e.target.value })
+          }
+          style={{ width: '100%' }}
+        />
+      </div>
+    </div>
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <input
+        type="number"
+        step="0.01"
+        placeholder="Valor cuota mensual"
+        value={invitacionForm.importe_mensual}
+        onChange={(e) =>
+          setInvitacionForm({ ...invitacionForm, importe_mensual: e.target.value })
+        }
+        required
+        style={{ flex: 2 }}
+      />
+      <input
+        type="text"
+        maxLength={3}
+        placeholder="ARS"
+        value={invitacionForm.moneda}
+        onChange={(e) =>
+          setInvitacionForm({ ...invitacionForm, moneda: e.target.value })
+        }
+        style={{ width: '70px' }}
+      />
+    </div>
+    <input
+      type="text"
+      placeholder="Mensaje opcional para el inquilino"
+      value={invitacionForm.mensaje}
+      onChange={(e) => setInvitacionForm({ ...invitacionForm, mensaje: e.target.value })}
+    />
+    <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
+      Enviar Invitación de Alquiler
+    </button>
+  </div>
+</form>
       </section>
 
       {/* 4. Mis Departamentos (Propietario e Inquilino) */}

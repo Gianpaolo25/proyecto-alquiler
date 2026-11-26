@@ -26,8 +26,38 @@ function GestionDepartamentoPage() {
   const [detalle, setDetalle] = useState(null);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
 
-  // Formulario para Inquilino: subir comprobante
+  // Crear servicio
+  const [servicioForm, setServicioForm] = useState({
+    nombre: '',
+    precio: '',
+    frecuencia: 'Mensual',
+    proveedor: '',
+    identificador_cuenta: '',
+  });
+
+  // Crear boleta de servicio
+  const [boletaForm, setBoletaForm] = useState({
+    departamento_servicio_id: '',
+    numero_boleta: '',
+    periodo_desde: '',
+    periodo_hasta: '',
+    fecha_vencimiento: '',
+    importe: '',
+    moneda: 'ARS',
+    archivo_boleta: '',
+  });
+
+  // Crear cuota de alquiler (Propietario)
+  const [cuotaForm, setCuotaForm] = useState({
+    periodo: new Date().toISOString().slice(0, 7) + '-01',
+    fecha_vencimiento: '',
+    importe: '',
+    moneda: 'ARS',
+  });
+
+  // Subir comprobante (Inquilino) — puede abrirse desde una cuota específica o boleta
   const [comprobanteForm, setComprobanteForm] = useState({
+    abierto: false,
     tipoDestino: 'cuota', // 'cuota' | 'boleta'
     cuota_alquiler_id: '',
     boleta_servicio_id: '',
@@ -39,13 +69,21 @@ function GestionDepartamentoPage() {
 
   const aplicarDetalle = (data) => {
     setDetalle(data);
-    setComprobanteForm((prev) => ({
-      ...prev,
-      cuota_alquiler_id:
-        prev.cuota_alquiler_id || (data.cuotasPendientes?.[0]?.idcuota_alquiler ? String(data.cuotasPendientes[0].idcuota_alquiler) : ''),
-      boleta_servicio_id:
-        prev.boleta_servicio_id || (data.boletasPendientes?.[0]?.idboleta_servicio ? String(data.boletasPendientes[0].idboleta_servicio) : ''),
-    }));
+
+    if (data.servicios?.length > 0) {
+      setBoletaForm((prev) => {
+        const existeActual = data.servicios.some(
+          (s) => String(s.iddepartamento_servicio) === String(prev.departamento_servicio_id)
+        );
+        return {
+          ...prev,
+          departamento_servicio_id: existeActual
+            ? prev.departamento_servicio_id
+            : String(data.servicios[0].iddepartamento_servicio),
+        };
+      });
+    }
+
   };
 
   useEffect(() => {
@@ -73,6 +111,85 @@ function GestionDepartamentoPage() {
     };
   }, [id, token, usuario, navigate]);
 
+  const abrirModalComprobanteCuota = (cuota) => {
+    setComprobanteForm({
+      abierto: true,
+      tipoDestino: 'cuota',
+      cuota_alquiler_id: String(cuota.idcuota_alquiler),
+      boleta_servicio_id: '',
+      fecha_pago_declarada: new Date().toISOString().slice(0, 10),
+      importe_declarado: String(cuota.importe || ''),
+      archivo_path: '',
+      observacion: `Pago alquiler período ${cuota.periodo}`,
+    });
+  };
+
+  const abrirModalComprobanteBoleta = (boleta) => {
+    setComprobanteForm({
+      abierto: true,
+      tipoDestino: 'boleta',
+      cuota_alquiler_id: '',
+      boleta_servicio_id: String(boleta.idboleta_servicio),
+      fecha_pago_declarada: new Date().toISOString().slice(0, 10),
+      importe_declarado: String(boleta.importe || ''),
+      archivo_path: '',
+      observacion: `Pago boleta ${boleta.servicio_nombre} #${boleta.numero_boleta || boleta.idboleta_servicio}`,
+    });
+  };
+
+  const handleCrearServicio = async (e) => {
+    e.preventDefault();
+    setFeedback({ tipo: '', texto: '' });
+    try {
+      const res = await api.post(`/gestion-departamento/${id}/servicios`, servicioForm);
+      setFeedback({ tipo: 'ok', texto: res.data.mensaje || 'Servicio creado.' });
+      setServicioForm({
+        nombre: '',
+        precio: '',
+        frecuencia: 'Mensual',
+        proveedor: '',
+        identificador_cuenta: '',
+      });
+      const actualizado = await fetchDetalleDepartamento(id);
+      aplicarDetalle(actualizado);
+    } catch (err) {
+      setFeedback({ tipo: 'error', texto: err.response?.data?.error || 'Error al crear servicio' });
+    }
+  };
+
+  const handleCrearBoleta = async (e) => {
+    e.preventDefault();
+    setFeedback({ tipo: '', texto: '' });
+    try {
+      const res = await api.post(`/gestion-departamento/${id}/boletas`, boletaForm);
+      setFeedback({ tipo: 'ok', texto: res.data.mensaje || 'Boleta creada.' });
+      setBoletaForm((prev) => ({
+        ...prev,
+        numero_boleta: '',
+        importe: '',
+        archivo_boleta: '',
+      }));
+      const actualizado = await fetchDetalleDepartamento(id);
+      aplicarDetalle(actualizado);
+    } catch (err) {
+      setFeedback({ tipo: 'error', texto: err.response?.data?.error || 'Error al crear boleta' });
+    }
+  };
+
+  const handleCrearCuota = async (e) => {
+    e.preventDefault();
+    setFeedback({ tipo: '', texto: '' });
+    try {
+      const res = await api.post(`/gestion-departamento/${id}/cuotas`, cuotaForm);
+      setFeedback({ tipo: 'ok', texto: res.data.mensaje || 'Cuota creada.' });
+      setCuotaForm((prev) => ({ ...prev, importe: '' }));
+      const actualizado = await fetchDetalleDepartamento(id);
+      aplicarDetalle(actualizado);
+    } catch (err) {
+      setFeedback({ tipo: 'error', texto: err.response?.data?.error || 'Error al crear cuota' });
+    }
+  };
+
   const handleSubirComprobante = async (e) => {
     e.preventDefault();
     setFeedback({ tipo: '', texto: '' });
@@ -84,7 +201,7 @@ function GestionDepartamentoPage() {
         comprobanteForm.tipoDestino === 'boleta' ? Number(comprobanteForm.boleta_servicio_id) : null,
       fecha_pago_declarada: comprobanteForm.fecha_pago_declarada,
       importe_declarado: comprobanteForm.importe_declarado,
-      archivo_path: comprobanteForm.archivo_path || 'comprobante.pdf',
+      archivo_path: comprobanteForm.archivo_path || 'comprobante_pago.pdf',
       observacion: comprobanteForm.observacion || null,
     };
 
@@ -93,6 +210,7 @@ function GestionDepartamentoPage() {
       setFeedback({ tipo: 'ok', texto: res.data.mensaje || 'Comprobante enviado.' });
       setComprobanteForm((prev) => ({
         ...prev,
+        abierto: false,
         importe_declarado: '',
         archivo_path: '',
         observacion: '',
@@ -141,10 +259,31 @@ function GestionDepartamentoPage() {
     }
   };
 
+  /* NUEVO */
+
+  const handleRevisarComprobante = async (comprobanteId, nuevoEstado) => {
+    setFeedback({ tipo: '', texto: '' });
+    try {
+      const res = await api.patch(
+        `/gestion-departamento/${id}/comprobantes/${comprobanteId}/revision`,
+        { estado_revision: nuevoEstado }
+      );
+      setFeedback({ tipo: 'ok', texto: res.data.mensaje });
+      const actualizado = await fetchDetalleDepartamento(id);
+      aplicarDetalle(actualizado);
+    } catch (err) {
+      setFeedback({
+        tipo: 'error',
+        texto: err.response?.data?.error || 'Error al revisar el comprobante',
+      });
+    }
+  };
+
+
   if (!token || !usuario) return null;
 
   return (
-    <div style={{ maxWidth: '1050px', margin: '2rem auto', padding: '0 1rem', fontFamily: 'sans-serif' }}>
+    <div style={{ maxWidth: '1080px', margin: '2rem auto', padding: '0 1rem', fontFamily: 'sans-serif' }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link to="/dashboard">← Volver al Menú Principal</Link>
       </div>
@@ -178,7 +317,7 @@ function GestionDepartamentoPage() {
               <strong>Número:</strong> {detalle.departamento.numero || '-'}
             </p>
             <p style={{ margin: '4px 0' }}>
-              <strong>Tu rol en este departamento:</strong> {detalle.rol}
+              <strong>Tu rol:</strong> {detalle.rol}
             </p>
             {detalle.departamento.alquiler_inicio && (
               <p style={{ margin: '4px 0', color: '#555' }}>
@@ -188,30 +327,46 @@ function GestionDepartamentoPage() {
             )}
           </section>
 
-          {/* Cuotas del alquiler: Pagadas vs Pendientes */}
+          {/* Cuotas del alquiler: Pagadas vs Pendientes + Comprobantes por mes */}
           <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
             <h3>Cuotas de Alquiler</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
               <div>
                 <h4>Períodos Pagados ({detalle.cuotasPagadas.length})</h4>
                 {detalle.cuotasPagadas.length === 0 ? (
                   <p style={{ color: '#666' }}>Sin cuotas pagadas registradas.</p>
                 ) : (
                   <ul>
-                    {detalle.cuotasPagadas.map((c) => (
-                      <li key={c.idcuota_alquiler} style={{ marginBottom: '6px' }}>
-                        Período: <strong>{c.periodo}</strong> — {c.moneda} {c.importe} ({c.estado})
-                        {detalle.rol === 'Propietario' && (
-                          <button
-                            type="button"
-                            onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pendiente')}
-                            style={{ marginLeft: '8px', cursor: 'pointer' }}
-                          >
-                            Marcar Pendiente
-                          </button>
-                        )}
-                      </li>
-                    ))}
+                    {detalle.cuotasPagadas.map((c) => {
+                      const compsCuota = detalle.comprobantes.filter(
+                        (cp) => cp.cuota_alquiler_id === c.idcuota_alquiler
+                      );
+                      return (
+                        <li key={c.idcuota_alquiler} style={{ marginBottom: '10px' }}>
+                          <div>
+                            Período: <strong>{c.periodo}</strong> — {c.moneda} {c.importe} ({c.estado})
+                            {detalle.rol === 'Propietario' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pendiente')}
+                                style={{ marginLeft: '8px', cursor: 'pointer' }}
+                              >
+                                Marcar Pendiente
+                              </button>
+                            )}
+                          </div>
+                          {compsCuota.length > 0 && (
+                            <ul style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
+                              {compsCuota.map((cp) => (
+                                <li key={cp.idcomprobante_pago}>
+                                  Comprobante: {cp.archivo_path} — ${cp.importe_declarado} ({cp.estado_revision})
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
@@ -222,24 +377,82 @@ function GestionDepartamentoPage() {
                   <p style={{ color: '#666' }}>No hay cuotas pendientes.</p>
                 ) : (
                   <ul>
-                    {detalle.cuotasPendientes.map((c) => (
-                      <li key={c.idcuota_alquiler} style={{ marginBottom: '6px' }}>
-                        Período: <strong>{c.periodo}</strong> — {c.moneda} {c.importe} (Vence: {c.fecha_vencimiento || '-'} | {c.estado})
-                        {detalle.rol === 'Propietario' && (
-                          <button
-                            type="button"
-                            onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pagada')}
-                            style={{ marginLeft: '8px', cursor: 'pointer' }}
-                          >
-                            Marcar Pagada
-                          </button>
-                        )}
-                      </li>
-                    ))}
+                    {detalle.cuotasPendientes.map((c) => {
+                      const compsCuota = detalle.comprobantes.filter(
+                        (cp) => cp.cuota_alquiler_id === c.idcuota_alquiler
+                      );
+                      return (
+                        <li key={c.idcuota_alquiler} style={{ marginBottom: '10px' }}>
+                          <div>
+                            Período: <strong>{c.periodo}</strong> — {c.moneda} {c.importe} (Vence:{' '}
+                            {c.fecha_vencimiento || '-'} | {c.estado})
+                          </div>
+                          <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {detalle.rol === 'Inquilino' && (
+                              <button
+                                type="button"
+                                onClick={() => abrirModalComprobanteCuota(c)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                Pagar alquiler / Subir comprobante
+                              </button>
+                            )}
+                            {detalle.rol === 'Propietario' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pagada')}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                Marcar Pagada
+                              </button>
+                            )}
+                          </div>
+                          {compsCuota.length > 0 && (
+                            <ul style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
+                              {compsCuota.map((cp) => (
+                                <li key={cp.idcomprobante_pago}>
+                                  Comprobante: {cp.archivo_path} — ${cp.importe_declarado} ({cp.estado_revision})
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
             </div>
+
+            {/* Formulario para que el Propietario cree cuotas adicionales */}
+            {detalle.rol === 'Propietario' && (
+              <form
+                onSubmit={handleCrearCuota}
+                style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}
+              >
+                <strong>Nueva Cuota de Alquiler:</strong>
+                <input
+                  type="date"
+                  value={cuotaForm.periodo}
+                  onChange={(e) => setCuotaForm({ ...cuotaForm, periodo: e.target.value })}
+                  required
+                />
+                <input
+                  type="date"
+                  value={cuotaForm.fecha_vencimiento}
+                  onChange={(e) => setCuotaForm({ ...cuotaForm, fecha_vencimiento: e.target.value })}
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Importe"
+                  value={cuotaForm.importe}
+                  onChange={(e) => setCuotaForm({ ...cuotaForm, importe: e.target.value })}
+                  required
+                />
+                <button type="submit" style={{ cursor: 'pointer' }}>Agregar Cuota</button>
+              </form>
+            )}
           </section>
 
           {/* Servicios y Boletas de Servicios */}
@@ -251,15 +464,53 @@ function GestionDepartamentoPage() {
               <ul>
                 {detalle.servicios.map((s) => (
                   <li key={s.iddepartamento_servicio}>
-                    <strong>{s.servicio_nombre}</strong> ({s.tipo_de_servicio || 'Servicio'}) — Proveedor:{' '}
-                    {s.proveedor || '-'} | Cuenta: {s.identificador_cuenta || '-'}
+                    <strong>{s.servicio_nombre}</strong> — Periodicidad / Precio: <em>{s.tipo_de_servicio || '-'}</em> |
+                    Proveedor: {s.proveedor || '-'} | Cuenta: {s.identificador_cuenta || '-'}
                   </li>
                 ))}
               </ul>
             )}
 
+            {/* Formulario para crear nuevo servicio */}
+            <form
+              onSubmit={handleCrearServicio}
+              style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}
+            >
+              <strong>Nuevo Servicio:</strong>
+              <input
+                type="text"
+                placeholder="Nombre (ej. Luz, Agua, Expensas)"
+                value={servicioForm.nombre}
+                onChange={(e) => setServicioForm({ ...servicioForm, nombre: e.target.value })}
+                required
+              />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Precio del servicio"
+                value={servicioForm.precio}
+                onChange={(e) => setServicioForm({ ...servicioForm, precio: e.target.value })}
+              />
+              <select
+                value={servicioForm.frecuencia}
+                onChange={(e) => setServicioForm({ ...servicioForm, frecuencia: e.target.value })}
+              >
+                <option value="Mensual">Cada mes (Mensual)</option>
+                <option value="Bimestral">Cada 2 meses (Bimestral)</option>
+                <option value="Trimestral">Cada 3 meses (Trimestral)</option>
+                <option value="Anual">Anual</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Proveedor (opcional)"
+                value={servicioForm.proveedor}
+                onChange={(e) => setServicioForm({ ...servicioForm, proveedor: e.target.value })}
+              />
+              <button type="submit" style={{ cursor: 'pointer' }}>Crear Servicio</button>
+            </form>
+
             <h3 style={{ marginTop: '1.5rem' }}>Boletas de Servicios (Pendientes y Pagadas)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
               <div>
                 <h4>Boletas Pendientes / Vencidas ({detalle.boletasPendientes.length})</h4>
                 {detalle.boletasPendientes.length === 0 ? (
@@ -267,20 +518,47 @@ function GestionDepartamentoPage() {
                 ) : (
                   <ul>
                     {detalle.boletasPendientes.map((b) => (
-                      <li key={b.idboleta_servicio} style={{ marginBottom: '8px' }}>
-                        <strong>{b.servicio_nombre}</strong> #{b.numero_boleta || b.idboleta_servicio} —{' '}
-                        {b.moneda} {b.importe} (Vence: {b.fecha_vencimiento || '-'} | <strong>{b.estado}</strong>)
-                        {detalle.rol === 'Propietario' && (
-                          <div style={{ marginTop: '4px' }}>
+                      <li key={b.idboleta_servicio} style={{ marginBottom: '10px' }}>
+                        <div>
+                          <strong>{b.servicio_nombre}</strong> #{b.numero_boleta || b.idboleta_servicio} —{' '}
+                          {b.moneda} {b.importe} (Vence: {b.fecha_vencimiento || '-'} | <strong>{b.estado}</strong>)
+                        </div>
+                        <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {detalle.rol === 'Inquilino' && (
                             <button
                               type="button"
-                              onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pagada')}
+                              onClick={() => abrirModalComprobanteBoleta(b)}
                               style={{ cursor: 'pointer' }}
                             >
-                              Marcar como Pagada
+                              Subir comprobante boleta
                             </button>
-                          </div>
-                        )}
+                          )}
+                          {detalle.rol === 'Propietario' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pagada')}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                Pagada
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Vencida')}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                Vencida
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pendiente')}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                Pendiente
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -294,17 +572,26 @@ function GestionDepartamentoPage() {
                 ) : (
                   <ul>
                     {detalle.boletasPagadas.map((b) => (
-                      <li key={b.idboleta_servicio} style={{ marginBottom: '8px' }}>
-                        <strong>{b.servicio_nombre}</strong> #{b.numero_boleta || b.idboleta_servicio} —{' '}
-                        {b.moneda} {b.importe} (<strong>{b.estado}</strong>)
+                      <li key={b.idboleta_servicio} style={{ marginBottom: '10px' }}>
+                        <div>
+                          <strong>{b.servicio_nombre}</strong> #{b.numero_boleta || b.idboleta_servicio} —{' '}
+                          {b.moneda} {b.importe} (<strong>{b.estado}</strong>)
+                        </div>
                         {detalle.rol === 'Propietario' && (
-                          <div style={{ marginTop: '4px' }}>
+                          <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                             <button
                               type="button"
                               onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pendiente')}
                               style={{ cursor: 'pointer' }}
                             >
-                              Marcar como Pendiente / No Pagada
+                              Marcar Pendiente
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Vencida')}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              Marcar Vencida
                             </button>
                           </div>
                         )}
@@ -314,53 +601,62 @@ function GestionDepartamentoPage() {
                 )}
               </div>
             </div>
+
+            {/* Formulario para cargar nueva boleta de servicio */}
+            {detalle.servicios.length > 0 && (
+              <form
+                onSubmit={handleCrearBoleta}
+                style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}
+              >
+                <strong>Nueva Boleta de Servicio:</strong>
+                <select
+                  value={boletaForm.departamento_servicio_id}
+                  onChange={(e) =>
+                    setBoletaForm({ ...boletaForm, departamento_servicio_id: e.target.value })
+                  }
+                  required
+                >
+                  {detalle.servicios.map((s) => (
+                    <option key={s.iddepartamento_servicio} value={s.iddepartamento_servicio}>
+                      {s.servicio_nombre}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="N° boleta"
+                  value={boletaForm.numero_boleta}
+                  onChange={(e) => setBoletaForm({ ...boletaForm, numero_boleta: e.target.value })}
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Importe"
+                  value={boletaForm.importe}
+                  onChange={(e) => setBoletaForm({ ...boletaForm, importe: e.target.value })}
+                  required
+                />
+                <input
+                  type="date"
+                  value={boletaForm.fecha_vencimiento}
+                  onChange={(e) => setBoletaForm({ ...boletaForm, fecha_vencimiento: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Archivo / enlace boleta"
+                  value={boletaForm.archivo_boleta}
+                  onChange={(e) => setBoletaForm({ ...boletaForm, archivo_boleta: e.target.value })}
+                />
+                <button type="submit" style={{ cursor: 'pointer' }}>Subir / Registrar Boleta</button>
+              </form>
+            )}
           </section>
 
-          {/* Subir comprobante si el usuario es Inquilino */}
-          {detalle.rol === 'Inquilino' && (
-            <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-              <h3>Subir Comprobante de Pago (Inquilino)</h3>
+          {/* Modal / Panel para subir comprobante de pago (Inquilino) */}
+          {detalle.rol === 'Inquilino' && comprobanteForm.abierto && (
+            <section style={{ border: '2px solid #2c3e50', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', background: '#f9fbfc' }}>
+              <h3>Subir Comprobante de Pago ({comprobanteForm.tipoDestino === 'cuota' ? 'Cuota de Alquiler' : 'Boleta de Servicio'})</h3>
               <form onSubmit={handleSubirComprobante} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '500px' }}>
-                <select
-                  value={comprobanteForm.tipoDestino}
-                  onChange={(e) => setComprobanteForm({ ...comprobanteForm, tipoDestino: e.target.value })}
-                >
-                  <option value="cuota">Cuota de Alquiler</option>
-                  <option value="boleta">Boleta de Servicio</option>
-                </select>
-
-                {comprobanteForm.tipoDestino === 'cuota' ? (
-                  <select
-                    value={comprobanteForm.cuota_alquiler_id}
-                    onChange={(e) =>
-                      setComprobanteForm({ ...comprobanteForm, cuota_alquiler_id: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="">Selecciona una cuota...</option>
-                    {detalle.cuotas.map((c) => (
-                      <option key={c.idcuota_alquiler} value={c.idcuota_alquiler}>
-                        Período {c.periodo} — {c.moneda} {c.importe} ({c.estado})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <select
-                    value={comprobanteForm.boleta_servicio_id}
-                    onChange={(e) =>
-                      setComprobanteForm({ ...comprobanteForm, boleta_servicio_id: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="">Selecciona una boleta de servicio...</option>
-                    {detalle.boletas.map((b) => (
-                      <option key={b.idboleta_servicio} value={b.idboleta_servicio}>
-                        {b.servicio_nombre} #{b.numero_boleta || b.idboleta_servicio} — {b.moneda} {b.importe} ({b.estado})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
                 <input
                   type="date"
                   value={comprobanteForm.fecha_pago_declarada}
@@ -381,11 +677,12 @@ function GestionDepartamentoPage() {
                 />
                 <input
                   type="text"
-                  placeholder="Nombre o ruta de archivo / comprobante (ej. transferencia_nov.pdf)"
+                  placeholder="Nombre o referencia del comprobante (ej. comprobante_enero.pdf)"
                   value={comprobanteForm.archivo_path}
                   onChange={(e) =>
                     setComprobanteForm({ ...comprobanteForm, archivo_path: e.target.value })
                   }
+                  required
                 />
                 <input
                   type="text"
@@ -395,25 +692,54 @@ function GestionDepartamentoPage() {
                     setComprobanteForm({ ...comprobanteForm, observacion: e.target.value })
                   }
                 />
-                <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-                  Enviar Comprobante
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ padding: '8px 14px', cursor: 'pointer' }}>
+                    Guardar Comprobante
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComprobanteForm((prev) => ({ ...prev, abierto: false }))}
+                    style={{ padding: '8px 14px', cursor: 'pointer' }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </form>
             </section>
           )}
 
-          {/* Historial de comprobantes cargados */}
+          {/* Historial general de comprobantes */}
           <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}>
-            <h3>Comprobantes de Pago Registrados</h3>
+            <h3>Todos los Comprobantes Cargados</h3>
             {detalle.comprobantes.length === 0 ? (
               <p style={{ color: '#666' }}>No hay comprobantes cargados aún.</p>
             ) : (
               <ul>
                 {detalle.comprobantes.map((cp) => (
-                  <li key={cp.idcomprobante_pago} style={{ marginBottom: '6px' }}>
-                    <strong>${cp.importe_declarado}</strong> — Fecha pago: {cp.fecha_pago_declarada} |
-                    Estado revisión: <strong>{cp.estado_revision}</strong> | Archivo: {cp.archivo_path}
-                    {cp.observacion ? ` (${cp.observacion})` : ''}
+                  <li key={cp.idcomprobante_pago} style={{ marginBottom: '10px' }}>
+                    <div>
+                      <strong>${cp.importe_declarado}</strong> — Fecha pago: {cp.fecha_pago_declarada} |
+                      Estado revisión: <strong>{cp.estado_revision}</strong> | Archivo: {cp.archivo_path}
+                      {cp.observacion ? ` (${cp.observacion})` : ''}
+                    </div>
+                    {detalle.rol === 'Propietario' && cp.estado_revision === 'pendiente' && (
+                      <div style={{ marginTop: '4px', display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRevisarComprobante(cp.idcomprobante_pago, 'aprobado')}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          Aprobar comprobante
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRevisarComprobante(cp.idcomprobante_pago, 'rechazado')}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          Rechazar comprobante
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
