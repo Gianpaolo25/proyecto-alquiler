@@ -1,5 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Alert,
+  AppBar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Divider,
+  Grid,
+  MenuItem,
+  Stack,
+  TextField,
+  Toolbar,
+  Typography,
+} from '@mui/material';
+import LogoutIcon from '@mui/icons-material/Logout';
+import ApartmentIcon from '@mui/icons-material/Apartment';
+import HomeWorkIcon from '@mui/icons-material/HomeWork';
+import SendIcon from '@mui/icons-material/Send';
 import api from '../services/api';
 
 function obtenerSesionGuardada() {
@@ -31,6 +52,12 @@ async function fetchDatosPanel() {
     misDepartamentos: resMisDeptos.data,
     invitaciones: resInv.data,
   };
+}
+
+function colorEstadoInvitacion(estado) {
+  if (estado === 'Aceptada') return 'success';
+  if (estado === 'Rechazada') return 'error';
+  return 'warning';
 }
 
 function DashboardPage() {
@@ -225,371 +252,483 @@ function DashboardPage() {
   if (!token || !usuario) return null;
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '2rem auto', padding: '0 1rem', fontFamily: 'sans-serif' }}>
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0 }}>Menú Principal</h1>
-          <p style={{ margin: '4px 0 0', color: '#555' }}>
-            Usuario: <strong>{usuario.nombre} {usuario.apellido}</strong> ({usuario.email})
-          </p>
-        </div>
-        <button type="button" onClick={handleLogout} style={{ padding: '8px 14px', cursor: 'pointer' }}>
-          Cerrar sesión
-        </button>
-      </header>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
+      <AppBar position="static" elevation={1}>
+        <Toolbar sx={{ flexWrap: 'wrap', gap: 1, py: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
+            Menú Principal
+          </Typography>
+          <Typography variant="body2" sx={{ mr: 1, opacity: 0.95 }}>
+            {usuario.nombre} {usuario.apellido} ({usuario.email})
+          </Typography>
+          <Button
+            color="inherit"
+            variant="outlined"
+            size="small"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            sx={{ borderColor: 'rgba(255,255,255,0.5)' }}
+          >
+            Cerrar sesión
+          </Button>
+        </Toolbar>
+      </AppBar>
 
-      {feedback.texto && (
-        <div
-          style={{
-            padding: '10px 14px',
-            borderRadius: '6px',
-            marginBottom: '1.5rem',
-            color: feedback.tipo === 'error' ? '#922b21' : '#1e8449',
-            background: feedback.tipo === 'error' ? '#fadbd8' : '#d4efdf',
-          }}
-        >
-          {feedback.texto}
-        </div>
-      )}
-
-      {/* 1. Registrar Edificio y Departamento */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <form
-          onSubmit={handleCrearEdificio}
-          style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}
-        >
-          <h3>1A. Registrar Edificio</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <input
-              type="text"
-              placeholder="Nombre del edificio"
-              value={edificioForm.nombre}
-              onChange={(e) => setEdificioForm({ ...edificioForm, nombre: e.target.value })}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Dirección"
-              value={edificioForm.direccion}
-              onChange={(e) => setEdificioForm({ ...edificioForm, direccion: e.target.value })}
-              required
-            />
-            <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-              Guardar Edificio
-            </button>
-          </div>
-        </form>
-
-        <form
-          onSubmit={handleCrearDepartamento}
-          style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}
-        >
-          <h3>1B. Registrar Departamento</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <select
-              value={deptoForm.edificio_id}
-              onChange={(e) => setDeptoForm({ ...deptoForm, edificio_id: e.target.value })}
-              required
-            >
-              <option value="">Selecciona un edificio...</option>
-              {edificio.map((ed) => (
-                <option key={ed.idedificio} value={ed.idedificio}>
-                  {ed.nombre} ({ed.direccion})
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Identificador (ej. 2B, Depto 101)"
-              value={deptoForm.identificador}
-              onChange={(e) => setDeptoForm({ ...deptoForm, identificador: e.target.value })}
-              required
-            />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Piso"
-                value={deptoForm.piso}
-                onChange={(e) => setDeptoForm({ ...deptoForm, piso: e.target.value })}
-                style={{ width: '50%' }}
-              />
-              <input
-                type="text"
-                placeholder="Número"
-                value={deptoForm.numero}
-                onChange={(e) => setDeptoForm({ ...deptoForm, numero: e.target.value })}
-                style={{ width: '50%' }}
-              />
-            </div>
-            <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-              Guardar Departamento
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {/* 2. Registrar Titularidad como Propietario & Enviar Invitación por Email */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <form
-          onSubmit={handleRegistrarPropietario}
-          style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}
-        >
-          <h3>2. Registrarme como Propietario</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <select
-              value={propietarioForm.departamento_id}
-              onChange={(e) =>
-                setPropietarioForm({ ...propietarioForm, departamento_id: e.target.value })
-              }
-              required
-            >
-              <option value="">Selecciona un departamento...</option>
-              {departamento.map((d) => (
-                <option key={d.iddepartamento} value={d.iddepartamento}>
-                  {d.edificio_nombre} - {d.identificador}
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              value={propietarioForm.fecha_desde}
-              onChange={(e) =>
-                setPropietarioForm({ ...propietarioForm, fecha_desde: e.target.value })
-              }
-              required
-            />
-            <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-              Asignarme como Propietario
-            </button>
-          </div>
-        </form>
-
-        <form
-  onSubmit={handleEnviarInvitacion}
-  style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}
->
-  <h3>3. Invitar Inquilino por Email (Propietario)</h3>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-    <select
-      value={invitacionForm.departamento_id}
-      onChange={(e) =>
-        setInvitacionForm({ ...invitacionForm, departamento_id: e.target.value })
-      }
-      required
-    >
-      <option value="">Selecciona uno de tus departamentos...</option>
-      {misDepartamentos.propietario.map((d) => (
-        <option key={d.iddepartamento} value={d.iddepartamento}>
-          {d.edificio_nombre} - {d.identificador}
-        </option>
-      ))}
-    </select>
-    <input
-      type="email"
-      placeholder="Email del usuario registrado"
-      value={invitacionForm.email_invitado}
-      onChange={(e) =>
-        setInvitacionForm({ ...invitacionForm, email_invitado: e.target.value })
-      }
-      required
-    />
-    <div style={{ display: 'flex', gap: '8px' }}>
-      <div style={{ flex: 1 }}>
-        <label style={{ fontSize: '12px' }}>Desde:</label>
-        <input
-          type="date"
-          value={invitacionForm.fecha_inicio}
-          onChange={(e) =>
-            setInvitacionForm({ ...invitacionForm, fecha_inicio: e.target.value })
-          }
-          required
-          style={{ width: '100%' }}
-        />
-      </div>
-      <div style={{ flex: 1 }}>
-        <label style={{ fontSize: '12px' }}>Hasta:</label>
-        <input
-          type="date"
-          value={invitacionForm.fecha_fin}
-          onChange={(e) =>
-            setInvitacionForm({ ...invitacionForm, fecha_fin: e.target.value })
-          }
-          style={{ width: '100%' }}
-        />
-      </div>
-    </div>
-    <div style={{ display: 'flex', gap: '8px' }}>
-      <input
-        type="number"
-        step="0.01"
-        placeholder="Valor cuota mensual"
-        value={invitacionForm.importe_mensual}
-        onChange={(e) =>
-          setInvitacionForm({ ...invitacionForm, importe_mensual: e.target.value })
-        }
-        required
-        style={{ flex: 2 }}
-      />
-      <input
-        type="text"
-        maxLength={3}
-        placeholder="ARS"
-        value={invitacionForm.moneda}
-        onChange={(e) =>
-          setInvitacionForm({ ...invitacionForm, moneda: e.target.value })
-        }
-        style={{ width: '70px' }}
-      />
-    </div>
-    <input
-      type="text"
-      placeholder="Mensaje opcional para el inquilino"
-      value={invitacionForm.mensaje}
-      onChange={(e) => setInvitacionForm({ ...invitacionForm, mensaje: e.target.value })}
-    />
-    <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-      Enviar Invitación de Alquiler
-    </button>
-  </div>
-</form>
-      </section>
-
-      {/* 4. Mis Departamentos (Propietario e Inquilino) */}
-      <section
-        style={{
-          border: '1px solid #ddd',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '2rem',
-        }}
-      >
-        <h3>4. Mis Departamentos y Gestión</h3>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '1rem',
-          }}
-        >
-          <div>
-            <h4>Como Propietario</h4>
-            {misDepartamentos.propietario.length === 0 ? (
-              <p style={{ color: '#666' }}>No tienes departamentos registrados como propietario.</p>
-            ) : (
-              <ul>
-                {misDepartamentos.propietario.map((d) => (
-                  <li key={`prop-${d.iddepartamento}`} style={{ marginBottom: '8px' }}>
-                    <strong>{d.edificio_nombre}</strong> — Depto {d.identificador}{' '}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/gestion-departamento/${d.iddepartamento}`)}
-                      style={{ marginLeft: '6px', cursor: 'pointer' }}
-                    >
-                      Gestionar
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <h4>Como Inquilino</h4>
-            {misDepartamentos.inquilino.length === 0 ? (
-              <p style={{ color: '#666' }}>No figuras como inquilino en ningún departamento aún.</p>
-            ) : (
-              <ul>
-                {misDepartamentos.inquilino.map((d) => (
-                  <li key={`inq-${d.iddepartamento}`} style={{ marginBottom: '8px' }}>
-                    <strong>{d.edificio_nombre}</strong> — Depto {d.identificador}{' '}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/gestion-departamento/${d.iddepartamento}`)}
-                      style={{ marginLeft: '6px', cursor: 'pointer' }}
-                    >
-                      Gestionar
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Invitaciones de Alquiler Recibidas */}
-      <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}>
-        <h3>5. Invitaciones de Alquiler Recibidas</h3>
-        {invitaciones.length === 0 ? (
-          <p style={{ color: '#666' }}>No tienes invitaciones de alquiler.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {invitaciones.map((inv) => (
-              <li
-                key={inv.idsolicitud_alquiler}
-                style={{
-                  borderBottom: '1px solid #eee',
-                  padding: '10px 0',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                }}
-              >
-                <div>
-                  <strong>{inv.edificio_nombre}</strong> — Depto {inv.identificador} | Estado:{' '}
-                  <strong>{inv.estado}</strong>
-                  <div style={{ fontSize: '13px', color: '#555' }}>
-                    Invita: {inv.propietario_nombre} {inv.propietario_apellido} (
-                    {inv.propietario_email})
-                    {inv.mensaje ? ` — "${inv.mensaje}"` : ''}
-                  </div>
-                </div>
-                {inv.estado === 'Pendiente' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleAceptarInvitacion(inv.idsolicitud_alquiler)}
-                      style={{ padding: '6px 12px', cursor: 'pointer' }}
-                    >
-                      Aceptar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRechazarInvitacion(inv.idsolicitud_alquiler)}
-                      style={{ padding: '6px 12px', cursor: 'pointer' }}
-                    >
-                      Rechazar
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        {feedback.texto && (
+          <Alert
+            severity={feedback.tipo === 'error' ? 'error' : 'success'}
+            onClose={() => setFeedback({ tipo: '', texto: '' })}
+            sx={{ mb: 3 }}
+          >
+            {feedback.texto}
+          </Alert>
         )}
-      </section>
-    </div>
+
+        <Grid container spacing={3}>
+          {/* 1A. Registrar Edificio */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card elevation={2} sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <ApartmentIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    1A. Registrar Edificio
+                  </Typography>
+                </Stack>
+                <Box component="form" onSubmit={handleCrearEdificio}>
+                  <Stack spacing={2}>
+                    <TextField
+                      label="Nombre del edificio"
+                      size="small"
+                      fullWidth
+                      required
+                      value={edificioForm.nombre}
+                      onChange={(e) => setEdificioForm({ ...edificioForm, nombre: e.target.value })}
+                    />
+                    <TextField
+                      label="Dirección"
+                      size="small"
+                      fullWidth
+                      required
+                      value={edificioForm.direccion}
+                      onChange={(e) => setEdificioForm({ ...edificioForm, direccion: e.target.value })}
+                    />
+                    <Button type="submit" variant="contained" fullWidth>
+                      Guardar Edificio
+                    </Button>
+                  </Stack>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 1B. Registrar Departamento */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card elevation={2} sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <HomeWorkIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    1B. Registrar Departamento
+                  </Typography>
+                </Stack>
+                <Box component="form" onSubmit={handleCrearDepartamento}>
+                  <Stack spacing={2}>
+                    <TextField
+                      select
+                      label="Edificio"
+                      size="small"
+                      fullWidth
+                      required
+                      value={deptoForm.edificio_id}
+                      onChange={(e) => setDeptoForm({ ...deptoForm, edificio_id: e.target.value })}
+                    >
+                      <MenuItem value="">Selecciona un edificio...</MenuItem>
+                      {edificio.map((ed) => (
+                        <MenuItem key={ed.idedificio} value={String(ed.idedificio)}>
+                          {ed.nombre} ({ed.direccion})
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      label="Identificador (ej. 2B, Depto 101)"
+                      size="small"
+                      fullWidth
+                      required
+                      value={deptoForm.identificador}
+                      onChange={(e) => setDeptoForm({ ...deptoForm, identificador: e.target.value })}
+                    />
+
+                    <Grid container spacing={1.5}>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          label="Piso"
+                          size="small"
+                          fullWidth
+                          value={deptoForm.piso}
+                          onChange={(e) => setDeptoForm({ ...deptoForm, piso: e.target.value })}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          label="Número"
+                          size="small"
+                          fullWidth
+                          value={deptoForm.numero}
+                          onChange={(e) => setDeptoForm({ ...deptoForm, numero: e.target.value })}
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Button type="submit" variant="contained" fullWidth>
+                      Guardar Departamento
+                    </Button>
+                  </Stack>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 2. Registrarme como Propietario */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card elevation={2} sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  2. Registrarme como Propietario
+                </Typography>
+                <Box component="form" onSubmit={handleRegistrarPropietario}>
+                  <Stack spacing={2}>
+                    <TextField
+                      select
+                      label="Departamento"
+                      size="small"
+                      fullWidth
+                      required
+                      value={propietarioForm.departamento_id}
+                      onChange={(e) =>
+                        setPropietarioForm({ ...propietarioForm, departamento_id: e.target.value })
+                      }
+                    >
+                      <MenuItem value="">Selecciona un departamento...</MenuItem>
+                      {departamento.map((d) => (
+                        <MenuItem key={d.iddepartamento} value={String(d.iddepartamento)}>
+                          {d.edificio_nombre} - {d.identificador}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      label="Fecha desde"
+                      type="date"
+                      size="small"
+                      fullWidth
+                      required
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      value={propietarioForm.fecha_desde}
+                      onChange={(e) =>
+                        setPropietarioForm({ ...propietarioForm, fecha_desde: e.target.value })
+                      }
+                    />
+
+                    <Button type="submit" variant="contained" color="secondary" fullWidth>
+                      Asignarme como Propietario
+                    </Button>
+                  </Stack>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 3. Invitar Inquilino por Email */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card elevation={2} sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <SendIcon color="secondary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    3. Invitar Inquilino por Email (Propietario)
+                  </Typography>
+                </Stack>
+                <Box component="form" onSubmit={handleEnviarInvitacion}>
+                  <Stack spacing={2}>
+                    <TextField
+                      select
+                      label="Tu departamento como propietario"
+                      size="small"
+                      fullWidth
+                      required
+                      value={invitacionForm.departamento_id}
+                      onChange={(e) =>
+                        setInvitacionForm({ ...invitacionForm, departamento_id: e.target.value })
+                      }
+                    >
+                      <MenuItem value="">Selecciona uno de tus departamentos...</MenuItem>
+                      {misDepartamentos.propietario.map((d) => (
+                        <MenuItem key={d.iddepartamento} value={String(d.iddepartamento)}>
+                          {d.edificio_nombre} - {d.identificador}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      label="Email del usuario registrado"
+                      type="email"
+                      size="small"
+                      fullWidth
+                      required
+                      value={invitacionForm.email_invitado}
+                      onChange={(e) =>
+                        setInvitacionForm({ ...invitacionForm, email_invitado: e.target.value })
+                      }
+                    />
+
+                    <Grid container spacing={1.5}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          label="Desde"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          required
+                          slotProps={{ inputLabel: { shrink: true } }}
+                          value={invitacionForm.fecha_inicio}
+                          onChange={(e) =>
+                            setInvitacionForm({ ...invitacionForm, fecha_inicio: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          label="Hasta"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          slotProps={{ inputLabel: { shrink: true } }}
+                          value={invitacionForm.fecha_fin}
+                          onChange={(e) =>
+                            setInvitacionForm({ ...invitacionForm, fecha_fin: e.target.value })
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Grid container spacing={1.5}>
+                      <Grid size={{ xs: 8, sm: 9 }}>
+                        <TextField
+                          label="Valor cuota mensual"
+                          type="number"
+                          size="small"
+                          fullWidth
+                          required
+                          slotProps={{ htmlInput: { step: '0.01' } }}
+                          value={invitacionForm.importe_mensual}
+                          onChange={(e) =>
+                            setInvitacionForm({ ...invitacionForm, importe_mensual: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 4, sm: 3 }}>
+                        <TextField
+                          label="Moneda"
+                          size="small"
+                          fullWidth
+                          slotProps={{ htmlInput: { maxLength: 3 } }}
+                          value={invitacionForm.moneda}
+                          onChange={(e) =>
+                            setInvitacionForm({ ...invitacionForm, moneda: e.target.value })
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <TextField
+                      label="Mensaje opcional para el inquilino"
+                      size="small"
+                      fullWidth
+                      value={invitacionForm.mensaje}
+                      onChange={(e) =>
+                        setInvitacionForm({ ...invitacionForm, mensaje: e.target.value })
+                      }
+                    />
+
+                    <Button type="submit" variant="contained" color="secondary" fullWidth>
+                      Enviar Invitación de Alquiler
+                    </Button>
+                  </Stack>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 4. Mis Departamentos y Gestión */}
+          <Grid size={{ xs: 12 }}>
+            <Card elevation={2}>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  4. Mis Departamentos y Gestión
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                      Como Propietario
+                    </Typography>
+                    {misDepartamentos.propietario.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No tienes departamentos registrados como propietario.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {misDepartamentos.propietario.map((d) => (
+                          <Box
+                            key={`prop-${d.iddepartamento}`}
+                            sx={{
+                              p: 1.5,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2">
+                              <strong>{d.edificio_nombre}</strong> — Depto {d.identificador}
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => navigate(`/gestion-departamento/${d.iddepartamento}`)}
+                            >
+                              Gestionar
+                            </Button>
+                          </Box>
+                        ))}
+                      </Stack>
+                    )}
+                  </Grid>
+
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                      Como Inquilino
+                    </Typography>
+                    {misDepartamentos.inquilino.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No figuras como inquilino en ningún departamento aún.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {misDepartamentos.inquilino.map((d) => (
+                          <Box
+                            key={`inq-${d.iddepartamento}`}
+                            sx={{
+                              p: 1.5,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2">
+                              <strong>{d.edificio_nombre}</strong> — Depto {d.identificador}
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => navigate(`/gestion-departamento/${d.iddepartamento}`)}
+                            >
+                              Gestionar
+                            </Button>
+                          </Box>
+                        ))}
+                      </Stack>
+                    )}
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 5. Invitaciones de Alquiler Recibidas */}
+          <Grid size={{ xs: 12 }}>
+            <Card elevation={2}>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  5. Invitaciones de Alquiler Recibidas
+                </Typography>
+                {invitaciones.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No tienes invitaciones de alquiler.
+                  </Typography>
+                ) : (
+                  <Stack divider={<Divider flexItem />} spacing={1.5}>
+                    {invitaciones.map((inv) => (
+                      <Box
+                        key={inv.idsolicitud_alquiler}
+                        sx={{
+                          py: 1,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 2,
+                        }}
+                      >
+                        <Box>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              {inv.edificio_nombre} — Depto {inv.identificador}
+                            </Typography>
+                            <Chip
+                              label={inv.estado}
+                              size="small"
+                              color={colorEstadoInvitacion(inv.estado)}
+                            />
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            Invita: {inv.propietario_nombre} {inv.propietario_apellido} (
+                            {inv.propietario_email})
+                            {inv.mensaje ? ` — "${inv.mensaje}"` : ''}
+                          </Typography>
+                        </Box>
+
+                        {inv.estado === 'Pendiente' && (
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              onClick={() => handleAceptarInvitacion(inv.idsolicitud_alquiler)}
+                            >
+                              Aceptar
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                              onClick={() => handleRechazarInvitacion(inv.idsolicitud_alquiler)}
+                            >
+                              Rechazar
+                            </Button>
+                          </Stack>
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
   );
 }
 

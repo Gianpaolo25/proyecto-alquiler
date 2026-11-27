@@ -1,5 +1,18 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Link,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import KeyIcon from '@mui/icons-material/Key';
 import api from '../services/api';
 
 function ForgotPasswordPage() {
@@ -25,32 +38,70 @@ function ForgotPasswordPage() {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '3rem auto', fontFamily: 'sans-serif' }}>
-      <h2>Recuperar Contraseña</h2>
-      <p style={{ fontSize: '14px', color: '#555' }}>
-        Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
-      </p>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="xs">
+        <Card elevation={3}>
+          <CardContent sx={{ p: 3.5 }}>
+            <Stack spacing={1} alignItems="center" sx={{ mb: 2 }}>
+              <KeyIcon color="primary" fontSize="large" />
+              <Typography variant="h5" component="h1" fontWeight={700}>
+                Recuperar Contraseña
+              </Typography>
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
+              </Typography>
+            </Stack>
 
-      {mensaje && <p style={{ color: 'green', background: '#e8f8f5', padding: '10px', borderRadius: '5px' }}>{mensaje}</p>}
-      {error && <p style={{ color: 'red', background: '#fdedec', padding: '10px', borderRadius: '5px' }}>{error}</p>}
+            {mensaje && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                {mensaje}
+              </Alert>
+            )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <input
-          type="email"
-          placeholder="Tu correo registrado"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <button type="submit" disabled={cargando} style={{ padding: '10px', cursor: 'pointer' }}>
-          {cargando ? 'Enviando...' : 'Enviar enlace'}
-        </button>
-      </form>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Tu correo registrado"
+                  type="email"
+                  fullWidth
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  disabled={cargando}
+                >
+                  {cargando ? 'Enviando...' : 'Enviar enlace'}
+                </Button>
+              </Stack>
+            </Box>
 
-      <p style={{ marginTop: '1rem' }}>
-        <Link to="/login">Volver al inicio de sesión</Link>
-      </p>
-    </div>
+            <Typography variant="body2" sx={{ mt: 2.5 }} textAlign="center">
+              <Link component={RouterLink} to="/login" underline="hover">
+                Volver al inicio de sesión
+              </Link>
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
 

@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Container,
+  Stack,
+  Typography,
+} from '@mui/material';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import api from '../services/api';
 
 function VerifyEmailPage() {
@@ -18,11 +30,14 @@ function VerifyEmailPage() {
 
     let activo = true;
 
-    api.post('/auth/verificar-email', { token })
+    api
+      .post('/auth/verificar-email', { token })
       .then((res) => {
         if (!activo) return;
         setEstado('exito');
-        setMensaje(res.data.mensaje || '¡Correo verificado con éxito! Ya puedes iniciar sesión.');
+        setMensaje(
+          res.data.mensaje || '¡Correo verificado con éxito! Ya puedes iniciar sesión.'
+        );
       })
       .catch((err) => {
         if (!activo) return;
@@ -35,28 +50,50 @@ function VerifyEmailPage() {
     };
   }, [token]);
 
+  const severidadAlerta =
+    estado === 'error' ? 'error' : estado === 'exito' ? 'success' : 'info';
+
   return (
-    <div style={{ maxWidth: '420px', margin: '4rem auto', textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h2>Verificación de Cuenta</h2>
-      <p style={{ color: estado === 'error' ? 'red' : estado === 'exito' ? 'green' : '#333', margin: '1.5rem 0' }}>
-        {mensaje}
-      </p>
-      {estado === 'exito' && (
-        <Link
-          to="/login"
-          style={{
-            display: 'inline-block',
-            padding: '10px 20px',
-            background: '#2c3e50',
-            color: '#fff',
-            textDecoration: 'none',
-            borderRadius: '5px',
-          }}
-        >
-          Ir al Login
-        </Link>
-      )}
-    </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="xs">
+        <Card elevation={3}>
+          <CardContent sx={{ p: 3.5, textAlign: 'center' }}>
+            <Stack spacing={2} alignItems="center">
+              <MarkEmailReadIcon color="primary" fontSize="large" />
+              <Typography variant="h5" component="h1" fontWeight={700}>
+                Verificación de Cuenta
+              </Typography>
+
+              {estado === 'verificando' && <CircularProgress size={32} />}
+
+              <Alert severity={severidadAlerta} sx={{ width: '100%', textAlign: 'left' }}>
+                {mensaje}
+              </Alert>
+
+              {estado === 'exito' && (
+                <Button
+                  component={RouterLink}
+                  to="/login"
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                >
+                  Ir al Login
+                </Button>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
 

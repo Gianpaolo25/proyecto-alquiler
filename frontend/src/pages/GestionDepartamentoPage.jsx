@@ -1,5 +1,31 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import {
+  Alert,
+  AppBar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Grid,
+  MenuItem,
+  Stack,
+  TextField,
+  Toolbar,
+  Typography,
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import HomeWorkIcon from '@mui/icons-material/HomeWork';
+import MiscellaneousServicesIcon from '@mui/icons-material/MiscellaneousServices';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import api from '../services/api';
 
 function obtenerSesionGuardada() {
@@ -16,6 +42,12 @@ function obtenerSesionGuardada() {
 async function fetchDetalleDepartamento(departamentoId) {
   const res = await api.get(`/gestion-departamento/${departamentoId}`);
   return res.data;
+}
+
+function colorEstadoPago(estado) {
+  if (estado === 'Pagada' || estado === 'aprobado') return 'success';
+  if (estado === 'Vencida' || estado === 'rechazado') return 'error';
+  return 'warning';
 }
 
 function GestionDepartamentoPage() {
@@ -55,7 +87,7 @@ function GestionDepartamentoPage() {
     moneda: 'ARS',
   });
 
-  // Subir comprobante (Inquilino) — puede abrirse desde una cuota específica o boleta
+  // Modal subir comprobante (Inquilino)
   const [comprobanteForm, setComprobanteForm] = useState({
     abierto: false,
     tipoDestino: 'cuota', // 'cuota' | 'boleta'
@@ -83,7 +115,6 @@ function GestionDepartamentoPage() {
         };
       });
     }
-
   };
 
   useEffect(() => {
@@ -259,8 +290,6 @@ function GestionDepartamentoPage() {
     }
   };
 
-  /* NUEVO */
-
   const handleRevisarComprobante = async (comprobanteId, nuevoEstado) => {
     setFeedback({ tipo: '', texto: '' });
     try {
@@ -279,475 +308,778 @@ function GestionDepartamentoPage() {
     }
   };
 
-
   if (!token || !usuario) return null;
 
   return (
-    <div style={{ maxWidth: '1080px', margin: '2rem auto', padding: '0 1rem', fontFamily: 'sans-serif' }}>
-      <div style={{ marginBottom: '1rem' }}>
-        <Link to="/dashboard">← Volver al Menú Principal</Link>
-      </div>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
+      <AppBar position="static" elevation={1}>
+        <Toolbar sx={{ flexWrap: 'wrap', gap: 1, py: 1 }}>
+          <Button
+            component={RouterLink}
+            to="/dashboard"
+            color="inherit"
+            startIcon={<ArrowBackIcon />}
+            size="small"
+            sx={{ mr: 1 }}
+          >
+            Menú Principal
+          </Button>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
+            Gestión de Departamento
+          </Typography>
+          {detalle && <Chip label={`Rol: ${detalle.rol}`} color="secondary" size="small" />}
+        </Toolbar>
+      </AppBar>
 
-      {feedback.texto && (
-        <div
-          style={{
-            padding: '10px 14px',
-            borderRadius: '6px',
-            marginBottom: '1.5rem',
-            color: feedback.tipo === 'error' ? '#922b21' : '#1e8449',
-            background: feedback.tipo === 'error' ? '#fadbd8' : '#d4efdf',
-          }}
-        >
-          {feedback.texto}
-        </div>
-      )}
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        {feedback.texto && (
+          <Alert
+            severity={feedback.tipo === 'error' ? 'error' : 'success'}
+            onClose={() => setFeedback({ tipo: '', texto: '' })}
+            sx={{ mb: 3 }}
+          >
+            {feedback.texto}
+          </Alert>
+        )}
 
-      {!detalle ? (
-        <p>Cargando información del departamento...</p>
-      ) : (
-        <>
-          {/* Información detallada del departamento */}
-          <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-            <h2 style={{ marginTop: 0 }}>
-              {detalle.departamento.edificio_nombre} — Depto {detalle.departamento.identificador}
-            </h2>
-            <p style={{ margin: '4px 0' }}>
-              <strong>Dirección:</strong> {detalle.departamento.edificio_direccion} |{' '}
-              <strong>Piso:</strong> {detalle.departamento.piso || '-'} |{' '}
-              <strong>Número:</strong> {detalle.departamento.numero || '-'}
-            </p>
-            <p style={{ margin: '4px 0' }}>
-              <strong>Tu rol:</strong> {detalle.rol}
-            </p>
-            {detalle.departamento.alquiler_inicio && (
-              <p style={{ margin: '4px 0', color: '#555' }}>
-                <strong>Contrato de alquiler:</strong> {detalle.departamento.alquiler_inicio} al{' '}
-                {detalle.departamento.alquiler_fin || 'Vigente'}
-              </p>
-            )}
-          </section>
-
-          {/* Cuotas del alquiler: Pagadas vs Pendientes + Comprobantes por mes */}
-          <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-            <h3>Cuotas de Alquiler</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-              <div>
-                <h4>Períodos Pagados ({detalle.cuotasPagadas.length})</h4>
-                {detalle.cuotasPagadas.length === 0 ? (
-                  <p style={{ color: '#666' }}>Sin cuotas pagadas registradas.</p>
-                ) : (
-                  <ul>
-                    {detalle.cuotasPagadas.map((c) => {
-                      const compsCuota = detalle.comprobantes.filter(
-                        (cp) => cp.cuota_alquiler_id === c.idcuota_alquiler
-                      );
-                      return (
-                        <li key={c.idcuota_alquiler} style={{ marginBottom: '10px' }}>
-                          <div>
-                            Período: <strong>{c.periodo}</strong> — {c.moneda} {c.importe} ({c.estado})
-                            {detalle.rol === 'Propietario' && (
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pendiente')}
-                                style={{ marginLeft: '8px', cursor: 'pointer' }}
-                              >
-                                Marcar Pendiente
-                              </button>
-                            )}
-                          </div>
-                          {compsCuota.length > 0 && (
-                            <ul style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
-                              {compsCuota.map((cp) => (
-                                <li key={cp.idcomprobante_pago}>
-                                  Comprobante: {cp.archivo_path} — ${cp.importe_declarado} ({cp.estado_revision})
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+        {!detalle ? (
+          <Card elevation={2}>
+            <CardContent>
+              <Typography>Cargando información del departamento...</Typography>
+            </CardContent>
+          </Card>
+        ) : (
+          <Stack spacing={3}>
+            {/* 1. Información detallada del departamento */}
+            <Card elevation={2}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <HomeWorkIcon color="primary" />
+                  <Typography variant="h5" fontWeight={700}>
+                    {detalle.departamento.edificio_nombre} — Depto {detalle.departamento.identificador}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Dirección:</strong> {detalle.departamento.edificio_direccion} |{' '}
+                  <strong>Piso:</strong> {detalle.departamento.piso || '-'} |{' '}
+                  <strong>Número:</strong> {detalle.departamento.numero || '-'}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  <strong>Tu rol en este departamento:</strong> {detalle.rol}
+                </Typography>
+                {detalle.departamento.alquiler_inicio && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    <strong>Contrato de alquiler:</strong> {detalle.departamento.alquiler_inicio} al{' '}
+                    {detalle.departamento.alquiler_fin || 'Vigente'}
+                  </Typography>
                 )}
-              </div>
+              </CardContent>
+            </Card>
 
-              <div>
-                <h4>Períodos Adeudados / Pendientes ({detalle.cuotasPendientes.length})</h4>
-                {detalle.cuotasPendientes.length === 0 ? (
-                  <p style={{ color: '#666' }}>No hay cuotas pendientes.</p>
-                ) : (
-                  <ul>
-                    {detalle.cuotasPendientes.map((c) => {
-                      const compsCuota = detalle.comprobantes.filter(
-                        (cp) => cp.cuota_alquiler_id === c.idcuota_alquiler
-                      );
-                      return (
-                        <li key={c.idcuota_alquiler} style={{ marginBottom: '10px' }}>
-                          <div>
-                            Período: <strong>{c.periodo}</strong> — {c.moneda} {c.importe} (Vence:{' '}
-                            {c.fecha_vencimiento || '-'} | {c.estado})
-                          </div>
-                          <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {detalle.rol === 'Inquilino' && (
-                              <button
-                                type="button"
-                                onClick={() => abrirModalComprobanteCuota(c)}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                Pagar alquiler / Subir comprobante
-                              </button>
-                            )}
-                            {detalle.rol === 'Propietario' && (
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pagada')}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                Marcar Pagada
-                              </button>
-                            )}
-                          </div>
-                          {compsCuota.length > 0 && (
-                            <ul style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
-                              {compsCuota.map((cp) => (
-                                <li key={cp.idcomprobante_pago}>
-                                  Comprobante: {cp.archivo_path} — ${cp.importe_declarado} ({cp.estado_revision})
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            </div>
+            {/* 2. Cuotas de Alquiler */}
+            <Card elevation={2}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <ReceiptLongIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    Cuotas de Alquiler
+                  </Typography>
+                </Stack>
 
-            {/* Formulario para que el Propietario cree cuotas adicionales */}
-            {detalle.rol === 'Propietario' && (
-              <form
-                onSubmit={handleCrearCuota}
-                style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}
-              >
-                <strong>Nueva Cuota de Alquiler:</strong>
-                <input
-                  type="date"
-                  value={cuotaForm.periodo}
-                  onChange={(e) => setCuotaForm({ ...cuotaForm, periodo: e.target.value })}
-                  required
-                />
-                <input
-                  type="date"
-                  value={cuotaForm.fecha_vencimiento}
-                  onChange={(e) => setCuotaForm({ ...cuotaForm, fecha_vencimiento: e.target.value })}
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Importe"
-                  value={cuotaForm.importe}
-                  onChange={(e) => setCuotaForm({ ...cuotaForm, importe: e.target.value })}
-                  required
-                />
-                <button type="submit" style={{ cursor: 'pointer' }}>Agregar Cuota</button>
-              </form>
-            )}
-          </section>
-
-          {/* Servicios y Boletas de Servicios */}
-          <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-            <h3>Servicios del Departamento</h3>
-            {detalle.servicios.length === 0 ? (
-              <p style={{ color: '#666' }}>No hay servicios asociados a este departamento.</p>
-            ) : (
-              <ul>
-                {detalle.servicios.map((s) => (
-                  <li key={s.iddepartamento_servicio}>
-                    <strong>{s.servicio_nombre}</strong> — Periodicidad / Precio: <em>{s.tipo_de_servicio || '-'}</em> |
-                    Proveedor: {s.proveedor || '-'} | Cuenta: {s.identificador_cuenta || '-'}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Formulario para crear nuevo servicio */}
-            <form
-              onSubmit={handleCrearServicio}
-              style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}
-            >
-              <strong>Nuevo Servicio:</strong>
-              <input
-                type="text"
-                placeholder="Nombre (ej. Luz, Agua, Expensas)"
-                value={servicioForm.nombre}
-                onChange={(e) => setServicioForm({ ...servicioForm, nombre: e.target.value })}
-                required
-              />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Precio del servicio"
-                value={servicioForm.precio}
-                onChange={(e) => setServicioForm({ ...servicioForm, precio: e.target.value })}
-              />
-              <select
-                value={servicioForm.frecuencia}
-                onChange={(e) => setServicioForm({ ...servicioForm, frecuencia: e.target.value })}
-              >
-                <option value="Mensual">Cada mes (Mensual)</option>
-                <option value="Bimestral">Cada 2 meses (Bimestral)</option>
-                <option value="Trimestral">Cada 3 meses (Trimestral)</option>
-                <option value="Anual">Anual</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Proveedor (opcional)"
-                value={servicioForm.proveedor}
-                onChange={(e) => setServicioForm({ ...servicioForm, proveedor: e.target.value })}
-              />
-              <button type="submit" style={{ cursor: 'pointer' }}>Crear Servicio</button>
-            </form>
-
-            <h3 style={{ marginTop: '1.5rem' }}>Boletas de Servicios (Pendientes y Pagadas)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-              <div>
-                <h4>Boletas Pendientes / Vencidas ({detalle.boletasPendientes.length})</h4>
-                {detalle.boletasPendientes.length === 0 ? (
-                  <p style={{ color: '#666' }}>No hay boletas pendientes.</p>
-                ) : (
-                  <ul>
-                    {detalle.boletasPendientes.map((b) => (
-                      <li key={b.idboleta_servicio} style={{ marginBottom: '10px' }}>
-                        <div>
-                          <strong>{b.servicio_nombre}</strong> #{b.numero_boleta || b.idboleta_servicio} —{' '}
-                          {b.moneda} {b.importe} (Vence: {b.fecha_vencimiento || '-'} | <strong>{b.estado}</strong>)
-                        </div>
-                        <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {detalle.rol === 'Inquilino' && (
-                            <button
-                              type="button"
-                              onClick={() => abrirModalComprobanteBoleta(b)}
-                              style={{ cursor: 'pointer' }}
+                <Grid container spacing={3}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                      Períodos Pagados ({detalle.cuotasPagadas.length})
+                    </Typography>
+                    {detalle.cuotasPagadas.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Sin cuotas pagadas registradas.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {detalle.cuotasPagadas.map((c) => {
+                          const compsCuota = detalle.comprobantes.filter(
+                            (cp) => cp.cuota_alquiler_id === c.idcuota_alquiler
+                          );
+                          return (
+                            <Box
+                              key={c.idcuota_alquiler}
+                              sx={{
+                                p: 1.5,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 2,
+                              }}
                             >
-                              Subir comprobante boleta
-                            </button>
-                          )}
-                          {detalle.rol === 'Propietario' && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pagada')}
-                                style={{ cursor: 'pointer' }}
+                              <Stack
+                                direction="row"
+                                justifyContent="space-between"
+                                alignItems="center"
+                                flexWrap="wrap"
+                                gap={1}
                               >
-                                Pagada
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Vencida')}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                Vencida
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pendiente')}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                Pendiente
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    Período {c.periodo} — {c.moneda} {c.importe}
+                                  </Typography>
+                                </Box>
+                                <Chip label={c.estado} size="small" color={colorEstadoPago(c.estado)} />
+                              </Stack>
 
-              <div>
-                <h4>Boletas Pagadas ({detalle.boletasPagadas.length})</h4>
-                {detalle.boletasPagadas.length === 0 ? (
-                  <p style={{ color: '#666' }}>No hay boletas pagadas.</p>
-                ) : (
-                  <ul>
-                    {detalle.boletasPagadas.map((b) => (
-                      <li key={b.idboleta_servicio} style={{ marginBottom: '10px' }}>
-                        <div>
-                          <strong>{b.servicio_nombre}</strong> #{b.numero_boleta || b.idboleta_servicio} —{' '}
-                          {b.moneda} {b.importe} (<strong>{b.estado}</strong>)
-                        </div>
-                        {detalle.rol === 'Propietario' && (
-                          <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pendiente')}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              Marcar Pendiente
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCambiarEstadoBoleta(b.idboleta_servicio, 'Vencida')}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              Marcar Vencida
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
+                              {detalle.rol === 'Propietario' && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ mt: 1 }}
+                                  onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pendiente')}
+                                >
+                                  Marcar Pendiente
+                                </Button>
+                              )}
 
-            {/* Formulario para cargar nueva boleta de servicio */}
-            {detalle.servicios.length > 0 && (
-              <form
-                onSubmit={handleCrearBoleta}
-                style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}
-              >
-                <strong>Nueva Boleta de Servicio:</strong>
-                <select
-                  value={boletaForm.departamento_servicio_id}
-                  onChange={(e) =>
-                    setBoletaForm({ ...boletaForm, departamento_servicio_id: e.target.value })
-                  }
-                  required
-                >
-                  {detalle.servicios.map((s) => (
-                    <option key={s.iddepartamento_servicio} value={s.iddepartamento_servicio}>
-                      {s.servicio_nombre}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  placeholder="N° boleta"
-                  value={boletaForm.numero_boleta}
-                  onChange={(e) => setBoletaForm({ ...boletaForm, numero_boleta: e.target.value })}
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Importe"
-                  value={boletaForm.importe}
-                  onChange={(e) => setBoletaForm({ ...boletaForm, importe: e.target.value })}
-                  required
-                />
-                <input
-                  type="date"
-                  value={boletaForm.fecha_vencimiento}
-                  onChange={(e) => setBoletaForm({ ...boletaForm, fecha_vencimiento: e.target.value })}
-                />
-                <input
-                  type="text"
-                  placeholder="Archivo / enlace boleta"
-                  value={boletaForm.archivo_boleta}
-                  onChange={(e) => setBoletaForm({ ...boletaForm, archivo_boleta: e.target.value })}
-                />
-                <button type="submit" style={{ cursor: 'pointer' }}>Subir / Registrar Boleta</button>
-              </form>
-            )}
-          </section>
-
-          {/* Modal / Panel para subir comprobante de pago (Inquilino) */}
-          {detalle.rol === 'Inquilino' && comprobanteForm.abierto && (
-            <section style={{ border: '2px solid #2c3e50', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', background: '#f9fbfc' }}>
-              <h3>Subir Comprobante de Pago ({comprobanteForm.tipoDestino === 'cuota' ? 'Cuota de Alquiler' : 'Boleta de Servicio'})</h3>
-              <form onSubmit={handleSubirComprobante} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '500px' }}>
-                <input
-                  type="date"
-                  value={comprobanteForm.fecha_pago_declarada}
-                  onChange={(e) =>
-                    setComprobanteForm({ ...comprobanteForm, fecha_pago_declarada: e.target.value })
-                  }
-                  required
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Importe abonado"
-                  value={comprobanteForm.importe_declarado}
-                  onChange={(e) =>
-                    setComprobanteForm({ ...comprobanteForm, importe_declarado: e.target.value })
-                  }
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Nombre o referencia del comprobante (ej. comprobante_enero.pdf)"
-                  value={comprobanteForm.archivo_path}
-                  onChange={(e) =>
-                    setComprobanteForm({ ...comprobanteForm, archivo_path: e.target.value })
-                  }
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Observación opcional"
-                  value={comprobanteForm.observacion}
-                  onChange={(e) =>
-                    setComprobanteForm({ ...comprobanteForm, observacion: e.target.value })
-                  }
-                />
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="submit" style={{ padding: '8px 14px', cursor: 'pointer' }}>
-                    Guardar Comprobante
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setComprobanteForm((prev) => ({ ...prev, abierto: false }))}
-                    style={{ padding: '8px 14px', cursor: 'pointer' }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </section>
-          )}
-
-          {/* Historial general de comprobantes */}
-          <section style={{ border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}>
-            <h3>Todos los Comprobantes Cargados</h3>
-            {detalle.comprobantes.length === 0 ? (
-              <p style={{ color: '#666' }}>No hay comprobantes cargados aún.</p>
-            ) : (
-              <ul>
-                {detalle.comprobantes.map((cp) => (
-                  <li key={cp.idcomprobante_pago} style={{ marginBottom: '10px' }}>
-                    <div>
-                      <strong>${cp.importe_declarado}</strong> — Fecha pago: {cp.fecha_pago_declarada} |
-                      Estado revisión: <strong>{cp.estado_revision}</strong> | Archivo: {cp.archivo_path}
-                      {cp.observacion ? ` (${cp.observacion})` : ''}
-                    </div>
-                    {detalle.rol === 'Propietario' && cp.estado_revision === 'pendiente' && (
-                      <div style={{ marginTop: '4px', display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleRevisarComprobante(cp.idcomprobante_pago, 'aprobado')}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          Aprobar comprobante
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRevisarComprobante(cp.idcomprobante_pago, 'rechazado')}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          Rechazar comprobante
-                        </button>
-                      </div>
+                              {compsCuota.length > 0 && (
+                                <Box sx={{ mt: 1, pl: 1.5, borderLeft: '2px solid', borderColor: 'divider' }}>
+                                  {compsCuota.map((cp) => (
+                                    <Typography key={cp.idcomprobante_pago} variant="caption" display="block" color="text.secondary">
+                                      Comprobante: {cp.archivo_path} — ${cp.importe_declarado} ({cp.estado_revision})
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Stack>
                     )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
-      )}
-    </div>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                      Períodos Adeudados / Pendientes ({detalle.cuotasPendientes.length})
+                    </Typography>
+                    {detalle.cuotasPendientes.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No hay cuotas pendientes.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {detalle.cuotasPendientes.map((c) => {
+                          const compsCuota = detalle.comprobantes.filter(
+                            (cp) => cp.cuota_alquiler_id === c.idcuota_alquiler
+                          );
+                          return (
+                            <Box
+                              key={c.idcuota_alquiler}
+                              sx={{
+                                p: 1.5,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 2,
+                              }}
+                            >
+                              <Stack
+                                direction="row"
+                                justifyContent="space-between"
+                                alignItems="center"
+                                flexWrap="wrap"
+                                gap={1}
+                              >
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    Período {c.periodo} — {c.moneda} {c.importe}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Vence: {c.fecha_vencimiento || '-'}
+                                  </Typography>
+                                </Box>
+                                <Chip label={c.estado} size="small" color={colorEstadoPago(c.estado)} />
+                              </Stack>
+
+                              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+                                {detalle.rol === 'Inquilino' && (
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<UploadFileIcon />}
+                                    onClick={() => abrirModalComprobanteCuota(c)}
+                                  >
+                                    Pagar alquiler / Subir comprobante
+                                  </Button>
+                                )}
+                                {detalle.rol === 'Propietario' && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="success"
+                                    onClick={() => handleCambiarEstadoCuota(c.idcuota_alquiler, 'Pagada')}
+                                  >
+                                    Marcar Pagada
+                                  </Button>
+                                )}
+                              </Stack>
+
+                              {compsCuota.length > 0 && (
+                                <Box sx={{ mt: 1, pl: 1.5, borderLeft: '2px solid', borderColor: 'divider' }}>
+                                  {compsCuota.map((cp) => (
+                                    <Typography key={cp.idcomprobante_pago} variant="caption" display="block" color="text.secondary">
+                                      Comprobante: {cp.archivo_path} — ${cp.importe_declarado} ({cp.estado_revision})
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    )}
+                  </Grid>
+                </Grid>
+
+                {detalle.rol === 'Propietario' && (
+                  <Box component="form" onSubmit={handleCrearCuota} sx={{ mt: 3 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                      Nueva Cuota de Alquiler
+                    </Typography>
+                    <Grid container spacing={1.5} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <TextField
+                          label="Período"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          required
+                          slotProps={{ inputLabel: { shrink: true } }}
+                          value={cuotaForm.periodo}
+                          onChange={(e) => setCuotaForm({ ...cuotaForm, periodo: e.target.value })}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <TextField
+                          label="Vencimiento"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          slotProps={{ inputLabel: { shrink: true } }}
+                          value={cuotaForm.fecha_vencimiento}
+                          onChange={(e) =>
+                            setCuotaForm({ ...cuotaForm, fecha_vencimiento: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 2 }}>
+                        <TextField
+                          label="Importe"
+                          type="number"
+                          size="small"
+                          fullWidth
+                          required
+                          slotProps={{ htmlInput: { step: '0.01' } }}
+                          value={cuotaForm.importe}
+                          onChange={(e) => setCuotaForm({ ...cuotaForm, importe: e.target.value })}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 2 }}>
+                        <Button type="submit" variant="contained" fullWidth>
+                          Agregar Cuota
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 3. Servicios y Boletas de Servicios */}
+            <Card elevation={2}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <MiscellaneousServicesIcon color="secondary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    Servicios del Departamento
+                  </Typography>
+                </Stack>
+
+                {detalle.servicios.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No hay servicios asociados a este departamento.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {detalle.servicios.map((s) => (
+                      <Box
+                        key={s.iddepartamento_servicio}
+                        sx={{ p: 1.2, bgcolor: 'action.hover', borderRadius: 2 }}
+                      >
+                        <Typography variant="body2">
+                          <strong>{s.servicio_nombre}</strong> — Periodicidad / Precio:{' '}
+                          <em>{s.tipo_de_servicio || '-'}</em> | Proveedor: {s.proveedor || '-'} |
+                          Cuenta: {s.identificador_cuenta || '-'}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+
+                <Box component="form" onSubmit={handleCrearServicio} sx={{ mt: 2.5 }}>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    Nuevo Servicio
+                  </Typography>
+                  <Grid container spacing={1.5} alignItems="center">
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <TextField
+                        label="Nombre (ej. Luz, Agua)"
+                        size="small"
+                        fullWidth
+                        required
+                        value={servicioForm.nombre}
+                        onChange={(e) => setServicioForm({ ...servicioForm, nombre: e.target.value })}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                      <TextField
+                        label="Precio"
+                        type="number"
+                        size="small"
+                        fullWidth
+                        slotProps={{ htmlInput: { step: '0.01' } }}
+                        value={servicioForm.precio}
+                        onChange={(e) => setServicioForm({ ...servicioForm, precio: e.target.value })}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <TextField
+                        select
+                        label="Frecuencia de pago"
+                        size="small"
+                        fullWidth
+                        value={servicioForm.frecuencia}
+                        onChange={(e) =>
+                          setServicioForm({ ...servicioForm, frecuencia: e.target.value })
+                        }
+                      >
+                        <MenuItem value="Mensual">Cada mes (Mensual)</MenuItem>
+                        <MenuItem value="Bimestral">Cada 2 meses (Bimestral)</MenuItem>
+                        <MenuItem value="Trimestral">Cada 3 meses (Trimestral)</MenuItem>
+                        <MenuItem value="Anual">Anual</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                      <TextField
+                        label="Proveedor"
+                        size="small"
+                        fullWidth
+                        value={servicioForm.proveedor}
+                        onChange={(e) =>
+                          setServicioForm({ ...servicioForm, proveedor: e.target.value })
+                        }
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 2 }}>
+                      <Button type="submit" variant="contained" color="secondary" fullWidth>
+                        Crear Servicio
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  Boletas de Servicios (Pendientes y Pagadas)
+                </Typography>
+
+                <Grid container spacing={3}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                      Boletas Pendientes / Vencidas ({detalle.boletasPendientes.length})
+                    </Typography>
+                    {detalle.boletasPendientes.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No hay boletas pendientes.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {detalle.boletasPendientes.map((b) => (
+                          <Box
+                            key={b.idboleta_servicio}
+                            sx={{
+                              p: 1.5,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              flexWrap="wrap"
+                              gap={1}
+                            >
+                              <Box>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {b.servicio_nombre} #{b.numero_boleta || b.idboleta_servicio} —{' '}
+                                  {b.moneda} {b.importe}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Vence: {b.fecha_vencimiento || '-'}
+                                </Typography>
+                              </Box>
+                              <Chip label={b.estado} size="small" color={colorEstadoPago(b.estado)} />
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+                              {detalle.rol === 'Inquilino' && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => abrirModalComprobanteBoleta(b)}
+                                >
+                                  Subir comprobante boleta
+                                </Button>
+                              )}
+                              {detalle.rol === 'Propietario' && (
+                                <>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="success"
+                                    onClick={() =>
+                                      handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pagada')
+                                    }
+                                  >
+                                    Pagada
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={() =>
+                                      handleCambiarEstadoBoleta(b.idboleta_servicio, 'Vencida')
+                                    }
+                                  >
+                                    Vencida
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="warning"
+                                    onClick={() =>
+                                      handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pendiente')
+                                    }
+                                  >
+                                    Pendiente
+                                  </Button>
+                                </>
+                              )}
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    )}
+                  </Grid>
+
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                      Boletas Pagadas ({detalle.boletasPagadas.length})
+                    </Typography>
+                    {detalle.boletasPagadas.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No hay boletas pagadas.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {detalle.boletasPagadas.map((b) => (
+                          <Box
+                            key={b.idboleta_servicio}
+                            sx={{
+                              p: 1.5,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              flexWrap="wrap"
+                              gap={1}
+                            >
+                              <Typography variant="body2" fontWeight={600}>
+                                {b.servicio_nombre} #{b.numero_boleta || b.idboleta_servicio} —{' '}
+                                {b.moneda} {b.importe}
+                              </Typography>
+                              <Chip label={b.estado} size="small" color={colorEstadoPago(b.estado)} />
+                            </Stack>
+
+                            {detalle.rol === 'Propietario' && (
+                              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="warning"
+                                  onClick={() =>
+                                    handleCambiarEstadoBoleta(b.idboleta_servicio, 'Pendiente')
+                                  }
+                                >
+                                  Marcar Pendiente
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  onClick={() =>
+                                    handleCambiarEstadoBoleta(b.idboleta_servicio, 'Vencida')
+                                  }
+                                >
+                                  Marcar Vencida
+                                </Button>
+                              </Stack>
+                            )}
+                          </Box>
+                        ))}
+                      </Stack>
+                    )}
+                  </Grid>
+                </Grid>
+
+                {detalle.servicios.length > 0 && (
+                  <Box component="form" onSubmit={handleCrearBoleta} sx={{ mt: 3 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                      Nueva Boleta de Servicio
+                    </Typography>
+                    <Grid container spacing={1.5} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextField
+                          select
+                          label="Servicio"
+                          size="small"
+                          fullWidth
+                          required
+                          value={boletaForm.departamento_servicio_id}
+                          onChange={(e) =>
+                            setBoletaForm({ ...boletaForm, departamento_servicio_id: e.target.value })
+                          }
+                        >
+                          {detalle.servicios.map((s) => (
+                            <MenuItem
+                              key={s.iddepartamento_servicio}
+                              value={String(s.iddepartamento_servicio)}
+                            >
+                              {s.servicio_nombre}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <TextField
+                          label="N° boleta"
+                          size="small"
+                          fullWidth
+                          value={boletaForm.numero_boleta}
+                          onChange={(e) =>
+                            setBoletaForm({ ...boletaForm, numero_boleta: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <TextField
+                          label="Importe"
+                          type="number"
+                          size="small"
+                          fullWidth
+                          required
+                          slotProps={{ htmlInput: { step: '0.01' } }}
+                          value={boletaForm.importe}
+                          onChange={(e) => setBoletaForm({ ...boletaForm, importe: e.target.value })}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <TextField
+                          label="Vencimiento"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          slotProps={{ inputLabel: { shrink: true } }}
+                          value={boletaForm.fecha_vencimiento}
+                          onChange={(e) =>
+                            setBoletaForm({ ...boletaForm, fecha_vencimiento: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 1.5 }}>
+                        <TextField
+                          label="Archivo"
+                          size="small"
+                          fullWidth
+                          value={boletaForm.archivo_boleta}
+                          onChange={(e) =>
+                            setBoletaForm({ ...boletaForm, archivo_boleta: e.target.value })
+                          }
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 1.5 }}>
+                        <Button type="submit" variant="contained" fullWidth>
+                          Registrar
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 4. Historial general de comprobantes */}
+            <Card elevation={2}>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  Todos los Comprobantes Cargados
+                </Typography>
+                {detalle.comprobantes.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No hay comprobantes cargados aún.
+                  </Typography>
+                ) : (
+                  <Stack divider={<Divider flexItem />} spacing={1.5}>
+                    {detalle.comprobantes.map((cp) => (
+                      <Box
+                        key={cp.idcomprobante_pago}
+                        sx={{
+                          py: 1,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 2,
+                        }}
+                      >
+                        <Box>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              ${cp.importe_declarado} — Pago: {cp.fecha_pago_declarada}
+                            </Typography>
+                            <Chip
+                              label={cp.estado_revision}
+                              size="small"
+                              color={colorEstadoPago(cp.estado_revision)}
+                            />
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            Archivo: {cp.archivo_path}
+                            {cp.observacion ? ` (${cp.observacion})` : ''}
+                          </Typography>
+                        </Box>
+
+                        {detalle.rol === 'Propietario' && cp.estado_revision === 'pendiente' && (
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() =>
+                                handleRevisarComprobante(cp.idcomprobante_pago, 'aprobado')
+                              }
+                            >
+                              Aprobar
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              onClick={() =>
+                                handleRevisarComprobante(cp.idcomprobante_pago, 'rechazado')
+                              }
+                            >
+                              Rechazar
+                            </Button>
+                          </Stack>
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          </Stack>
+        )}
+      </Container>
+
+      {/* Modal Dialog para subir comprobante de pago (Inquilino) */}
+      <Dialog
+        open={Boolean(detalle?.rol === 'Inquilino' && comprobanteForm.abierto)}
+        onClose={() => setComprobanteForm((prev) => ({ ...prev, abierto: false }))}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Subir Comprobante de Pago (
+          {comprobanteForm.tipoDestino === 'cuota' ? 'Cuota de Alquiler' : 'Boleta de Servicio'})
+        </DialogTitle>
+        <Box component="form" onSubmit={handleSubirComprobante}>
+          <DialogContent>
+            <Stack spacing={2}>
+              <TextField
+                label="Fecha de pago declarada"
+                type="date"
+                size="small"
+                fullWidth
+                required
+                slotProps={{ inputLabel: { shrink: true } }}
+                value={comprobanteForm.fecha_pago_declarada}
+                onChange={(e) =>
+                  setComprobanteForm({ ...comprobanteForm, fecha_pago_declarada: e.target.value })
+                }
+              />
+              <TextField
+                label="Importe abonado"
+                type="number"
+                size="small"
+                fullWidth
+                required
+                slotProps={{ htmlInput: { step: '0.01' } }}
+                value={comprobanteForm.importe_declarado}
+                onChange={(e) =>
+                  setComprobanteForm({ ...comprobanteForm, importe_declarado: e.target.value })
+                }
+              />
+              <TextField
+                label="Nombre o referencia del comprobante (ej. comprobante_enero.pdf)"
+                size="small"
+                fullWidth
+                required
+                value={comprobanteForm.archivo_path}
+                onChange={(e) =>
+                  setComprobanteForm({ ...comprobanteForm, archivo_path: e.target.value })
+                }
+              />
+              <TextField
+                label="Observación opcional"
+                size="small"
+                fullWidth
+                value={comprobanteForm.observacion}
+                onChange={(e) =>
+                  setComprobanteForm({ ...comprobanteForm, observacion: e.target.value })
+                }
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              type="button"
+              onClick={() => setComprobanteForm((prev) => ({ ...prev, abierto: false }))}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" variant="contained">
+              Guardar Comprobante
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </Box>
   );
 }
 

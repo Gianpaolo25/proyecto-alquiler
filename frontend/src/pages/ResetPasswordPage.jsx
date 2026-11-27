@@ -1,5 +1,18 @@
 import { useState } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Link,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import LockResetIcon from '@mui/icons-material/LockReset';
 import api from '../services/api';
 
 function ResetPasswordPage() {
@@ -41,36 +54,75 @@ function ResetPasswordPage() {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '3rem auto', fontFamily: 'sans-serif' }}>
-      <h2>Nueva Contraseña</h2>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="xs">
+        <Card elevation={3}>
+          <CardContent sx={{ p: 3.5 }}>
+            <Stack spacing={1} alignItems="center" sx={{ mb: 2.5 }}>
+              <LockResetIcon color="primary" fontSize="large" />
+              <Typography variant="h5" component="h1" fontWeight={700}>
+                Nueva Contraseña
+              </Typography>
+            </Stack>
 
-      {mensaje && <p style={{ color: 'green', background: '#e8f8f5', padding: '10px', borderRadius: '5px' }}>{mensaje}</p>}
-      {error && <p style={{ color: 'red', background: '#fdedec', padding: '10px', borderRadius: '5px' }}>{error}</p>}
+            {mensaje && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                {mensaje}
+              </Alert>
+            )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <input
-          type="password"
-          placeholder="Nueva contraseña"
-          value={nuevaPassword}
-          onChange={(e) => setNuevaPassword(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Confirmar nueva contraseña"
-          value={confirmarPassword}
-          onChange={(e) => setConfirmarPassword(e.target.value)}
-          required
-        />
-        <button type="submit" disabled={cargando} style={{ padding: '10px', cursor: 'pointer' }}>
-          {cargando ? 'Guardando...' : 'Restablecer contraseña'}
-        </button>
-      </form>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Nueva contraseña"
+                  type="password"
+                  fullWidth
+                  required
+                  value={nuevaPassword}
+                  onChange={(e) => setNuevaPassword(e.target.value)}
+                />
+                <TextField
+                  label="Confirmar nueva contraseña"
+                  type="password"
+                  fullWidth
+                  required
+                  value={confirmarPassword}
+                  onChange={(e) => setConfirmarPassword(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  disabled={cargando}
+                >
+                  {cargando ? 'Guardando...' : 'Restablecer contraseña'}
+                </Button>
+              </Stack>
+            </Box>
 
-      <p style={{ marginTop: '1rem' }}>
-        <Link to="/login">Volver al login</Link>
-      </p>
-    </div>
+            <Typography variant="body2" sx={{ mt: 2.5 }} textAlign="center">
+              <Link component={RouterLink} to="/login" underline="hover">
+                Volver al login
+              </Link>
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
 
